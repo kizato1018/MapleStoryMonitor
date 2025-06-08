@@ -21,33 +21,9 @@ class ConfigManager:
     
     def _get_default_config(self) -> Dict[str, Any]:
         """獲取預設配置"""
-        return {
-            "global": {
-                "fps": 1.0,
-                "window_title": "MapleStory Worlds",
-                "ocr_allow_list": "0123456789.[]/%"
-            },
-            "tabs": {
-                "HP": {
-                "x": 377,
-                "y": 705,
-                "w": 90,
-                "h": 18
-                },
-                "MP": {
-                "x": 542,
-                "y": 705,
-                "w": 90,
-                "h": 18
-                },
-                "EXP": {
-                "x": 730,
-                "y": 705,
-                "w": 125,
-                "h": 18
-                }
-            }
-        }
+        with open("config/default_config.json", 'r', encoding='utf-8') as f:
+            loaded_config = json.load(f)
+        return loaded_config
     
     def load_config(self) -> bool:
         """

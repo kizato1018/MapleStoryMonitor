@@ -83,8 +83,8 @@ class WindowsCaptureEngine(BaseCaptureEngine):
             self.cleanup_resources()
             return False
     
-    def capture_region(self) -> Optional[Image.Image]:
-        """捕捉指定區域"""
+    def capture_window(self) -> Optional[Image.Image]:
+        """捕捉完整視窗畫面"""
         if not WIN32_AVAILABLE:
             return None
         
@@ -98,53 +98,51 @@ class WindowsCaptureEngine(BaseCaptureEngine):
             hdcMem = resources['hdcMem']
             hbm = resources['hbm']
             region = resources['region']
-            
+
             # 確保視窗仍然存在
             if not self.is_window_valid(hwnd):
                 return None
-            
-            x, y, w, h = region['x'], region['y'], region['w'], region['h']
-            
-            # 獲取視窗大小
+
+            # 取得視窗大小與座標
             left, top, right, bottom = win32gui.GetWindowRect(hwnd)
             window_width = right - left
             window_height = bottom - top
-            
-            # 創建臨時位圖來存放整個視窗
+
+            # 直接捕捉整個視窗內容
             hdcTemp = hdcMem.CreateCompatibleDC()
             hbmTemp = win32ui.CreateBitmap()
             hbmTemp.CreateCompatibleBitmap(hdcMem, window_width, window_height)
             hdcTemp.SelectObject(hbmTemp)
-            
-            # 使用PrintWindow擷取整個視窗
+
             result = self.user32.PrintWindow(hwnd, hdcTemp.GetSafeHdc(), 2)  # PW_RENDERFULLCONTENT
-            
+
             if result:
-                # 從整個視窗中複製指定區域到目標位圖
-                hdcBitmap.BitBlt((0, 0), (w, h), hdcTemp, (x, y), win32con.SRCCOPY)
+                # 直接將整個視窗內容轉為PIL Image
+                bmpinfo = hbmTemp.GetInfo()
+                bmpstr = hbmTemp.GetBitmapBits(True)
+                img = Image.frombuffer(
+                    'RGB',
+                    (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
+                    bmpstr, 'raw', 'BGRX', 0, 1
+                )
             else:
-                # 回退到直接BitBlt方法
-                hdcBitmap.BitBlt((0, 0), (w, h), hdcMem, (x, y), win32con.SRCCOPY)
-            
+                # 回退到 BitBlt 畫面
+                hdcTemp.BitBlt((0, 0), (window_width, window_height), hdcMem, (0, 0), win32con.SRCCOPY)
+                bmpinfo = hbmTemp.GetInfo()
+                bmpstr = hbmTemp.GetBitmapBits(True)
+                img = Image.frombuffer(
+                    'RGB',
+                    (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
+                    bmpstr, 'raw', 'BGRX', 0, 1
+                )
+
             # 清理臨時資源
             win32gui.DeleteObject(hbmTemp.GetHandle())
             hdcTemp.DeleteDC()
-            
-            # 獲取位圖數據
-            bmpinfo = hbm.GetInfo()
-            bmpstr = hbm.GetBitmapBits(True)
-            
-            # 轉換為PIL Image
-            img = Image.frombuffer(
-                'RGB',
-                (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
-                bmpstr, 'raw', 'BGRX', 0, 1
-            )
-            
+
             return img
-            
         except Exception as e:
-            logger.error(f"Windows捕捉錯誤: {e}")
+            logger.error(f"Windows捕捉完整畫面錯誤: {e}")
             return None
     
     def cleanup_resources(self) -> None:

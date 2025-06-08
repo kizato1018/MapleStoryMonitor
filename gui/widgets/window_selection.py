@@ -8,8 +8,9 @@ from tkinter import ttk, messagebox
 from typing import Optional, Dict, Any, List, Tuple, Callable
 import time
 
-from capture.base_capture import CaptureFactory
+from capture.base_capture import BaseCaptureEngine, create_capture_engine
 from utils.log import get_logger
+from utils.common import FuzzySearchMatcher
 
 logger = get_logger(__name__)
 
@@ -17,7 +18,7 @@ logger = get_logger(__name__)
 class WindowSelectionWidget:
     """視窗選擇控制元件"""
     
-    def __init__(self, parent, config_callback: Optional[Callable] = None):
+    def __init__(self, parent, capture_engine: BaseCaptureEngine = None, config_callback: Optional[Callable] = None):
         self.parent = parent
         self.config_callback = config_callback
         self.window_title_var = tk.StringVar(value="")
@@ -26,17 +27,17 @@ class WindowSelectionWidget:
         self.is_expanded = False  # 視窗列表展開狀態
         self.filtered_indices = []  # 儲存搜尋結果的索引
         
+        # 初始化模糊搜尋匹配器
+        self.fuzzy_matcher = FuzzySearchMatcher(confidence_threshold=0.8)
+        
         # 移除重複的捕捉引擎創建，將在需要時從外部獲取
-        self.capture_engine = None
+        self.capture_engine = capture_engine
         
         if self.config_callback:
             self.window_title_var.trace('w', lambda *args: self.config_callback())
         
         self._create_widget()
     
-    def set_capture_engine(self, capture_engine):
-        """設定共享的捕捉引擎"""
-        self.capture_engine = capture_engine
     
     def _create_widget(self):
         """創建視窗選擇控制元件"""
@@ -46,15 +47,18 @@ class WindowSelectionWidget:
         title_frame = ttk.Frame(self.frame)
         title_frame.pack(fill=tk.X, pady=5)
         
-        ttk.Label(title_frame, text="視窗標題:").pack(side=tk.LEFT, padx=5)
-        entry = ttk.Entry(title_frame, textvariable=self.window_title_var, width=30)
-        entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        ttk.Label(title_frame, text="視窗標題:").pack(side=tk.LEFT, padx=(0, 5))
+        
+        # 先放置按鈕，確保其寬度固定且優先顯示
+        self.toggle_button = ttk.Button(title_frame, text="展開列表", command=self._toggle_window_list, width=10)
+        self.toggle_button.pack(side=tk.RIGHT, padx=(5, 0))
+        
+        # 輸入框放在中間，會自動填充剩餘空間
+        entry = ttk.Entry(title_frame, textvariable=self.window_title_var)
+        entry.pack(side=tk.LEFT, padx=(0, 5), fill=tk.X, expand=True)
         
         # 綁定Enter鍵事件到自動搜尋
         entry.bind('<Return>', lambda e: self._auto_search_from_entry())
-        
-        self.toggle_button = ttk.Button(title_frame, text="展開列表", command=self._toggle_window_list)
-        self.toggle_button.pack(side=tk.LEFT, padx=5)
         
         # 視窗列表（預設隱藏）
         self.list_frame = ttk.Frame(self.frame)
@@ -83,7 +87,7 @@ class WindowSelectionWidget:
             self._refresh_window_list()
     
     def _auto_search_from_entry(self):
-        """從輸入框自動搜尋視窗"""
+        """從輸入框自動搜尋視窗（支援模糊搜尋）"""
         search_text = self.window_title_var.get().strip().lower()
         if not search_text:
             return
@@ -92,40 +96,47 @@ class WindowSelectionWidget:
         if not self.is_expanded:
             self._toggle_window_list()
         
-        # 執行搜尋並高亮匹配項
-        self._highlight_matching_windows(search_text)
+        # 執行模糊搜尋並高亮匹配項
+        self._fuzzy_search_and_highlight(search_text)
     
-    def _highlight_matching_windows(self, search_text: str):
-        """高亮匹配的視窗，但保持完整列表顯示"""
+    def _fuzzy_search_and_highlight(self, search_text: str):
+        """模糊搜尋並高亮匹配的視窗"""
         if not search_text:
             return
         
         # 清除之前的選擇
         self.window_listbox.selection_clear(0, tk.END)
         
-        # 尋找匹配項並高亮第一個
-        first_match_index = None
-        for i, (hwnd, title) in enumerate(self.window_list):
-            if search_text in title.lower():
-                if first_match_index is None:
-                    first_match_index = i
-                    self.window_listbox.selection_set(i)
-                    self.window_listbox.see(i)  # 滾動到可見位置
+        # 使用模糊搜尋匹配器找到匹配項
+        matches = self.fuzzy_matcher.find_best_matches(
+            search_text, 
+            self.window_list,
+            key_func=lambda x: x[1]  # 使用標題進行匹配
+        )
         
-        if first_match_index is not None:
+        if matches:
+            # 選擇第一個最佳匹配
+            best_match_index = matches[0][0]
+            self.window_listbox.selection_set(best_match_index)
+            self.window_listbox.see(best_match_index)
+            
             # 自動選擇第一個匹配項
-            self._select_window_by_index(first_match_index)
-            self.status_label.config(text=f"找到匹配視窗並已選擇")
+            self._select_window_by_index(best_match_index)
+            
+            # 顯示匹配結果
+            confidence = matches[0][1]
+            if len(matches) == 1:
+                self.status_label.config(text=f"找到匹配視窗並已選擇 (信心度: {confidence:.2f})")
+            else:
+                self.status_label.config(text=f"找到 {len(matches)} 個匹配視窗，已選擇最佳匹配 (信心度: {confidence:.2f})")
         else:
-            self.status_label.config(text=f"未找到包含 '{search_text}' 的視窗")
+            self.status_label.config(text=f"未找到高信心度匹配 '{search_text}' 的視窗")
     
     def _refresh_window_list(self):
         """刷新視窗列表"""
         try:
             if not self.capture_engine:
-                # 如果沒有設定捕捉引擎，創建一個臨時的
-                from capture.base_capture import CaptureFactory
-                self.capture_engine = CaptureFactory.create_capture_engine()
+                raise ValueError("捕捉引擎未設定")
                 
             self.window_list = self.capture_engine.get_window_list()
             self.window_listbox.delete(0, tk.END)
@@ -154,7 +165,7 @@ class WindowSelectionWidget:
         search_text = self.window_title_var.get().strip().lower()
         if not search_text:
             self.status_label.config(text="視窗標題為空")
-            return False
+            return False, ""
         
         # 刷新視窗列表以獲取最新的視窗
         self._refresh_window_list()
@@ -165,10 +176,11 @@ class WindowSelectionWidget:
                 self.selected_hwnd = hwnd
                 self.window_title_var.set(title)
                 self.status_label.config(text=f"自動選擇視窗: {title}")
-                return True
+                self.capture_engine.set_window(self.selected_hwnd)
+                return True, title
         
         self.status_label.config(text=f"未找到包含 '{search_text}' 的視窗")
-        return False
+        return False, ""
     
     def _select_window_by_index(self, index: int):
         """根據索引選擇視窗"""
@@ -177,6 +189,7 @@ class WindowSelectionWidget:
             self.selected_hwnd = hwnd
             self.window_title_var.set(title)
             self.status_label.config(text=f"已選擇: {title}")
+            logger.info(f"選擇視窗: hwnd={hwnd}, title={title}")
     
     def _on_window_select(self, event):
         """視窗選擇事件處理"""
@@ -184,6 +197,7 @@ class WindowSelectionWidget:
         if selection:
             index = selection[0]
             self._select_window_by_index(index)
+            self.capture_engine.set_window(self.selected_hwnd)
     
     def pack(self, **kwargs):
         """打包元件"""

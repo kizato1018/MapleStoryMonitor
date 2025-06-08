@@ -53,7 +53,6 @@ class RegionSelectionWidget:
         button_frame = ttk.Frame(self.frame)
         button_frame.pack(fill=tk.X, pady=5)
         
-        ttk.Button(button_frame, text="自動設定為整個視窗", command=self._auto_set_full_window).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="滑鼠選取區域", command=self._start_mouse_selection).pack(side=tk.LEFT, padx=5)
         
         # 初始化選取相關變數
@@ -63,18 +62,10 @@ class RegionSelectionWidget:
         self.start_x = 0
         self.start_y = 0
 
-    def set_auto_callback(self, callback: Callable):
-        """設定自動設定回調函數"""
-        self.auto_callback = callback
     
     def set_target_window_callback(self, callback: Callable):
         """設定獲取目標視窗的回調函數"""
         self.get_target_window = callback
-    
-    def _auto_set_full_window(self):
-        """自動設定為整個視窗"""
-        if self.auto_callback:
-            self.auto_callback()
     
     def _start_mouse_selection(self):
         """開始滑鼠選取區域"""

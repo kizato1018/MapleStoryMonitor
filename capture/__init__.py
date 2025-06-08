@@ -4,7 +4,7 @@ Capture Package
 """
 
 import sys
-from .base_capture import BaseCaptureEngine, CaptureFactory
+from .base_capture import BaseCaptureEngine, create_capture_engine
 from utils.log import get_logger
 
 logger = get_logger(__name__)
@@ -31,7 +31,7 @@ else:
     MAC_AVAILABLE = False
 
 # 根據可用性決定導出的類別
-__all__ = ['BaseCaptureEngine', 'CaptureFactory']
+__all__ = ['BaseCaptureEngine', 'create_capture_engine']
 
 if WINDOWS_AVAILABLE:
     __all__.append('WindowsCaptureEngine')

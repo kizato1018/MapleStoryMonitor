@@ -84,10 +84,9 @@ class MacCaptureEngine(BaseCaptureEngine):
                 old_region.get('w') == new_region.get('w') and
                 old_region.get('h') == new_region.get('h'))
 
-    def capture_region(self) -> Optional[Image.Image]:
+    def capture_window(self) -> Optional[Image.Image]:
         if not PYOBJC_AVAILABLE or not self.is_initialized:
             return None
-
         try:
             if self.window_id:
                 # 取得視窗資訊
@@ -104,14 +103,7 @@ class MacCaptureEngine(BaseCaptureEngine):
                 w = int(bounds['Width'])
                 h = int(bounds['Height'])
 
-                # 取得區域設定
-                region = self.current_resources['region']
-                rel_x = region.get('x', 0)
-                rel_y = region.get('y', 0)
-                rel_w = region.get('w', w)
-                rel_h = region.get('h', h)
-
-                # 先抓整個視窗
+                # 直接抓整個視窗
                 image_ref = CGWindowListCreateImage(
                     CGRectMake(x, y, w, h),
                     kCGWindowListOptionIncludingWindow,
@@ -121,24 +113,11 @@ class MacCaptureEngine(BaseCaptureEngine):
                 if not image_ref:
                     logger.warning("CGWindowListCreateImage 回傳 None")
                     return None
-
                 pil_img = self._cgimage_to_pil(image_ref)
                 if pil_img is None:
                     logger.warning("CGImage 轉 PIL 失敗")
                     return None
-
-                # 裁切區域
-                if (rel_x > 0 or rel_y > 0 or rel_w < w or rel_h < h):
-                    crop_x = max(0, min(rel_x, pil_img.width))
-                    crop_y = max(0, min(rel_y, pil_img.height))
-                    crop_w = min(rel_w, pil_img.width - crop_x)
-                    crop_h = min(rel_h, pil_img.height - crop_y)
-                    if crop_w <= 0 or crop_h <= 0:
-                        logger.warning("裁切區域無效")
-                        return None
-                    pil_img = pil_img.crop((crop_x, crop_y, crop_x + crop_w, crop_y + crop_h))
                 return pil_img
-
             else:
                 # ...原本的螢幕區域擷取...
                 image_ref = CGWindowListCreateImage(
@@ -150,7 +129,6 @@ class MacCaptureEngine(BaseCaptureEngine):
                 if not image_ref:
                     return None
                 return self._cgimage_to_pil(image_ref)
-
         except Exception as e:
             logger.error(f"Mac區域捕捉錯誤: {e}")
             import traceback

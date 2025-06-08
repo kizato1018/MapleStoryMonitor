@@ -1,7 +1,7 @@
-import time
 import re
 from typing import Optional, List, Tuple
 from collections import deque
+from module.monitor_timer import MonitorTimer
 
 class EXPManager:
     """負責處理EXP相關邏輯"""
@@ -10,63 +10,46 @@ class EXPManager:
         self.exp = None
         self.last_valid_exp = None  # 記錄最後一次有效的經驗值
         self.exp_history = deque(maxlen=600)  # 10分鐘，每秒一筆
-        self.start_time = None
+        self.timer = MonitorTimer()  # 使用MonitorTimer管理時間
         self.start_exp_value = None  # int or None
         self.start_exp_percent = None
-        self.is_tracking = False
-        self.is_paused = False  # 新增暫停狀態
-        self.last_update_time = None
-        self.paused_time = 0  # 累計暫停的時間
-        self.pause_start_time = None  # 暫停開始時間
 
     def start_tracking(self):
         """開始追蹤經驗"""
-        current_time = time.time()
-        self.start_time = current_time
+        self.timer.start_tracking()
         exp_value, exp_percent = self._parse_exp_value(self.exp) if self.exp else (None, None)
         self.start_exp_value = exp_value
         self.start_exp_percent = exp_percent
-        self.is_tracking = True
-        self.is_paused = False
-        self.paused_time = 0
-        self.pause_start_time = None
         # 清空歷史記錄
         self.exp_history.clear()
         if exp_value is not None or exp_percent is not None:
-            self.exp_history.append((current_time, exp_value, exp_percent))
+            self.exp_history.append((self.timer.start_time, exp_value, exp_percent))
+
+    def is_tracking(self) -> bool:
+        """檢查是否正在追蹤經驗"""
+        return self.timer.is_tracking
+    def is_paused(self) -> bool:
+        """檢查是否暫停追蹤經驗"""
+        return self.timer.is_paused
 
     def pause_tracking(self):
         """暫停追蹤經驗"""
-        if self.is_tracking and not self.is_paused:
-            self.is_paused = True
-            self.pause_start_time = time.time()
+        self.timer.pause_tracking()
 
     def resume_tracking(self):
         """恢復追蹤經驗"""
-        if self.is_tracking and self.is_paused:
-            self.is_paused = False
-            if self.pause_start_time is not None:
-                self.paused_time += time.time() - self.pause_start_time
-                self.pause_start_time = None
+        self.timer.resume_tracking()
 
     def stop_tracking(self):
         """停止追蹤經驗"""
-        self.is_tracking = False
-        self.is_paused = False
-        self.paused_time = 0
-        self.pause_start_time = None
+        self.timer.stop_tracking()
 
     def reset_tracking(self):
         """重置追蹤"""
-        self.start_time = None
+        self.timer.reset_tracking()
         self.start_exp_value = None
         self.start_exp_percent = None
-        self.is_tracking = False
-        self.is_paused = False
         self.exp_history.clear()
-        self.last_update_time = None
-        self.paused_time = 0
-        self.pause_start_time = None
 
     def update(self, exp_value: str):
         """更新經驗值"""
@@ -81,25 +64,38 @@ class EXPManager:
             # 如果新值無效，保持原有的 exp 值但使用最後有效值進行計算
             self.exp = exp_value  # 保存原始值用於顯示
         
-        if self.is_tracking and not self.is_paused:
-            current_time = time.time()
+        if self.timer.is_tracking and not self.timer.is_paused:
+            # 使用計時器基準時間，而非直接使用 time.time()
+            current_effective_time = self._get_current_effective_time()
             
             # 使用最後有效的經驗值進行計算
             calc_value, calc_percent = self._get_valid_exp_values()
             
             if calc_value is not None or calc_percent is not None:
-                # 僅每秒保留一筆資料
-                if not self.exp_history or int(current_time) > int(self.exp_history[-1][0]):
-                    self.exp_history.append((current_time, calc_value, calc_percent))
-                    self.last_update_time = current_time
+                # 僅每秒保留一筆資料，使用有效時間計算
+                if not self.exp_history or int(current_effective_time) > int(self.exp_history[-1][0]):
+                    self.exp_history.append((current_effective_time, calc_value, calc_percent))
+                    self.timer.update_last_update_time()
                 
                 # 如果這是第一次有效的經驗值，設為起始值
                 if self.start_exp_value is None and calc_value is not None:
                     self.start_exp_value = calc_value
                 if self.start_exp_percent is None and calc_percent is not None:
                     self.start_exp_percent = calc_percent
-                if self.start_time is None:
-                    self.start_time = current_time
+                if self.timer.start_time is None:
+                    self.timer.start_time = current_effective_time
+
+    def _get_current_effective_time(self) -> float:
+        """獲取當前有效時間（基於計時器的時間基準）"""
+        if not self.timer.is_tracking or self.timer.start_time is None:
+            return 0.0
+        
+        elapsed = self.timer.get_elapsed_time()
+        if elapsed is None:
+            return self.timer.start_time
+        
+        # 返回基於起始時間加上有效經過時間的時間點
+        return self.timer.start_time + elapsed
 
     def _get_valid_exp_values(self) -> Tuple[Optional[int], Optional[float]]:
         """獲取有效的經驗值和百分比（優先使用最後有效值）"""
@@ -141,17 +137,7 @@ class EXPManager:
 
     def get_elapsed_time(self) -> Optional[float]:
         """獲取已經過時間（秒），排除暫停時間"""
-        if not self.is_tracking or self.start_time is None:
-            return None
-        
-        current_time = time.time()
-        total_paused = self.paused_time
-        
-        # 如果目前正在暫停，加上當前暫停時間
-        if self.is_paused and self.pause_start_time is not None:
-            total_paused += current_time - self.pause_start_time
-        
-        return current_time - self.start_time - total_paused
+        return self.timer.get_elapsed_time()
 
     def _get_current_exp_values(self) -> Tuple[Optional[int], Optional[float]]:
         """獲取當前經驗值和百分比"""
@@ -186,8 +172,8 @@ class EXPManager:
 
     def _calculate_10min_exp_actual(self) -> Tuple[Optional[int], Optional[float]]:
         """計算實際10分鐘經驗（超過10分鐘時使用）"""
-        current_time = time.time()
-        target_time = current_time - 600  # 10分鐘前
+        current_effective_time = self._get_current_effective_time()
+        target_time = current_effective_time - 600  # 10分鐘前（基於有效時間）
         cur_value, cur_percent = self._get_current_exp_values()
         
         # 找到最接近10分鐘前的記錄
@@ -210,7 +196,7 @@ class EXPManager:
         Returns:
             Tuple[(10分鐘經驗值, 10分鐘經驗百分比), (總累計經驗值, 總累計經驗百分比)]
         """
-        if not self.is_tracking or not self.exp_history:
+        if not self.timer.is_tracking or not self.exp_history:
             return None, None
             
         cur_value, cur_percent = self._get_current_exp_values()
@@ -274,7 +260,7 @@ class EXPManager:
         Returns:
             Optional[Tuple[hours, minutes, seconds]]
         """
-        if not self.is_tracking or not self.exp_history:
+        if not self.timer.is_tracking or not self.exp_history:
             return None
             
         cur_value, cur_percent = self._get_current_exp_values()
@@ -329,11 +315,12 @@ class EXPManager:
         estimated_levelup_data = self.get_estimated_levelup_time_data()
         elapsed_time = self.get_elapsed_time()
         cur_value, cur_percent = self._get_current_exp_values()
+        timer_status = self.timer.get_status()
         
         return {
             "EXP": self.exp,
-            "is_tracking": self.is_tracking,
-            "is_paused": self.is_paused,
+            "is_tracking": timer_status["is_tracking"],
+            "is_paused": timer_status["is_paused"],
             "elapsed_time": elapsed_time,
             "exp_per_10min": exp_per_10min,
             "total_exp": total_exp,
@@ -344,5 +331,6 @@ class EXPManager:
             "start_exp_value": self.start_exp_value,
             "start_exp_percent": self.start_exp_percent,
             "current_exp_value": cur_value,
-            "current_exp_percent": cur_percent
+            "current_exp_percent": cur_percent,
+            "timer_status": timer_status
         }

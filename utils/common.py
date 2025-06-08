@@ -193,3 +193,142 @@ def validate_region(x: int, y: int, w: int, h: int,
         h = max(1, h)
     
     return x, y, w, h
+
+
+class FuzzySearchMatcher:
+    """模糊搜尋匹配器"""
+    
+    def __init__(self, confidence_threshold: float = 0.8):
+        """
+        初始化模糊搜尋匹配器
+        
+        Args:
+            confidence_threshold: 信心度閾值 (0.0-1.0)
+        """
+        self.confidence_threshold = max(0.0, min(1.0, confidence_threshold))
+    
+    def calculate_fuzzy_score(self, search_text: str, target_text: str) -> float:
+        """
+        計算模糊匹配分數 (0.0-1.0)
+        
+        Args:
+            search_text: 搜尋文字
+            target_text: 目標文字
+            
+        Returns:
+            float: 匹配分數 (0.0-1.0)
+        """
+        if not search_text or not target_text:
+            return 0.0
+        
+        search_text = search_text.lower()
+        target_text = target_text.lower()
+        
+        # 完全匹配給最高分
+        if search_text == target_text:
+            return 1.0
+        
+        # 包含完整搜尋文字給高分
+        if search_text in target_text:
+            return self._calculate_substring_score(search_text, target_text)
+        
+        # 字符序列匹配分數
+        char_score = self._calculate_character_score(search_text, target_text)
+        
+        # 單詞邊界匹配分數
+        word_score = self._calculate_word_boundary_score(search_text, target_text)
+        
+        return max(char_score, word_score)
+    
+    def _calculate_substring_score(self, search_text: str, target_text: str) -> float:
+        """計算子字符串匹配分數"""
+        position = target_text.find(search_text)
+        position_bonus = max(0, 0.3 - position * 0.02)  # 位置越前分數越高
+        length_ratio = len(search_text) / len(target_text)  # 搜尋文字佔目標的比例
+        base_score = 0.7 + position_bonus + length_ratio * 0.2
+        return min(0.99, base_score)  # 不完全匹配最高0.99
+    
+    def _calculate_character_score(self, search_text: str, target_text: str) -> float:
+        """計算字符序列匹配分數"""
+        search_chars = list(search_text)
+        target_chars = list(target_text)
+        
+        matched_chars = 0
+        search_index = 0
+        
+        for target_char in target_chars:
+            if search_index < len(search_chars) and target_char == search_chars[search_index]:
+                matched_chars += 1
+                search_index += 1
+        
+        if matched_chars == 0:
+            return 0.0
+        
+        # 基於匹配字符數和順序的分數
+        sequence_score = (matched_chars / len(search_chars)) * 0.4
+        
+        # 額外分數：如果匹配的字符是連續的
+        continuous_bonus = 0.2 if matched_chars == len(search_chars) else 0
+        
+        return sequence_score + continuous_bonus
+    
+    def _calculate_word_boundary_score(self, search_text: str, target_text: str) -> float:
+        """計算單詞邊界匹配分數"""
+        # 將目標文字按分隔符分割成單詞
+        words = target_text.replace('_', ' ').replace('-', ' ').split()
+        
+        for word in words:
+            if word.startswith(search_text):
+                return 0.6
+            elif search_text in word:
+                return 0.4
+        
+        return 0.0
+    
+    def find_best_matches(self, search_text: str, candidates: list, 
+                         key_func: callable = None) -> list:
+        """
+        在候選列表中找到最佳匹配
+        
+        Args:
+            search_text: 搜尋文字
+            candidates: 候選列表
+            key_func: 從候選項提取搜尋目標文字的函數
+            
+        Returns:
+            list: 匹配結果列表，每項包含 (index, score, candidate)
+        """
+        if not search_text or not candidates:
+            return []
+        
+        matches = []
+        for i, candidate in enumerate(candidates):
+            target_text = key_func(candidate) if key_func else str(candidate)
+            score = self.calculate_fuzzy_score(search_text, target_text)
+            
+            if score >= self.confidence_threshold:
+                matches.append((i, score, candidate))
+        
+        # 按分數排序（分數越高越好）
+        matches.sort(key=lambda x: x[1], reverse=True)
+        return matches
+    
+    def find_best_match(self, search_text: str, candidates: list, 
+                       key_func: callable = None) -> tuple:
+        """
+        找到單個最佳匹配
+        
+        Args:
+            search_text: 搜尋文字
+            candidates: 候選列表
+            key_func: 從候選項提取搜尋目標文字的函數
+            
+        Returns:
+            tuple: (index, score, candidate) 或 (None, 0.0, None)
+        """
+        matches = self.find_best_matches(search_text, candidates, key_func)
+        return matches[0] if matches else (None, 0.0, None)
+    
+    def set_confidence_threshold(self, threshold: float) -> None:
+        """設定信心度閾值"""
+        self.confidence_threshold = max(0.0, min(1.0, threshold))

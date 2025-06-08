@@ -12,7 +12,7 @@ from PIL import Image
 
 from gui.widgets.region_selection import RegionSelectionWidget
 from gui.widgets.preview_widget import PreviewWidget
-from capture.base_capture import CaptureFactory
+from capture.base_capture import BaseCaptureEngine, create_capture_engine
 from utils.common import FrequencyController
 from utils.log import get_logger
 
@@ -21,10 +21,10 @@ logger = get_logger(__name__)
 
 class GameMonitorTab:
     """單個監控標籤頁類別"""
-    
     def __init__(self, parent, tab_name: str, config_callback: Optional[Callable] = None, 
                  shared_frequency_var: Optional[tk.StringVar] = None, 
-                 shared_window_widget=None):
+                 capture_engine: BaseCaptureEngine = None,
+                 get_window_info_callback: Optional[Callable] = None):
         self.parent = parent
         self.tab_name = tab_name
         self.config_callback = config_callback
@@ -34,29 +34,14 @@ class GameMonitorTab:
         self.is_capturing = False
         self.capture_thread = None
         self.shared_frequency_var = shared_frequency_var
-        self.shared_window_widget = shared_window_widget
+        self.get_window_info_callback = get_window_info_callback
         
-        # 捕捉引擎
-        self.capture_engine = CaptureFactory.create_capture_engine()
-        # 預設5.0，啟動時同步shared_frequency_var
-        init_fps = 5.0
-        if self.shared_frequency_var:
-            try:
-                init_fps = float(self.shared_frequency_var.get())
-            except Exception:
-                pass
-        self.frequency_controller = FrequencyController(init_fps)
-        
-        # 當前捕捉狀態
-        self.current_hwnd = None
-        self.current_region = None
+        # 捕捉引擎 - 使用外部傳入的實例
+        self.capture_engine = capture_engine
         
         self._create_tab()
         
-        # 設定區域選取元件的目標視窗回調（在創建標籤頁後）
-        if self.shared_window_widget:
-            self.region_widget.set_target_window_callback(self.shared_window_widget.get_window_info)
-    
+
     def _create_tab(self):
         """創建標籤頁內容"""
         # 主框架
@@ -64,19 +49,16 @@ class GameMonitorTab:
         
         # 左側控制區域
         control_frame = ttk.Frame(main_frame)
-        control_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
+        control_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 區域選擇元件（暫時不傳遞config_callback）
+        # 區域選擇元件
         self.region_widget = RegionSelectionWidget(control_frame, None)
-        self.region_widget.pack(fill=tk.X, pady=5)
-        
-        # 設定區域選取元件的回調函數
-        if self.shared_window_widget:
-            self.region_widget.set_target_window_callback(self.shared_window_widget.get_window_info)
+        self.region_widget.set_target_window_callback(self.get_window_info_callback)
+        self.region_widget.pack(fill=tk.X, pady=(0, 10))
         
         # OCR結果顯示
         result_frame = ttk.LabelFrame(control_frame, text="辨識結果", padding=10)
-        result_frame.pack(fill=tk.X, pady=5)
+        result_frame.pack(fill=tk.X, pady=(0, 10))
 
         self.result_label = tk.Label(
             result_frame,
@@ -89,9 +71,9 @@ class GameMonitorTab:
         )
         self.result_label.pack(fill=tk.X)
         
-        # 右側預覽區域
-        preview_frame = ttk.Frame(main_frame)
-        preview_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # 預覽區域（移到OCR結果下方）
+        preview_frame = ttk.LabelFrame(control_frame, text="預覽畫面", padding=5)
+        preview_frame.pack(fill=tk.BOTH, expand=True)
         
         self.preview_widget = PreviewWidget(preview_frame)
         self.preview_widget.pack(fill=tk.BOTH, expand=True)
@@ -116,40 +98,16 @@ class GameMonitorTab:
         """擷取迴圈"""
         while self.is_capturing:
             try:
-                # 獲取共享的頻率設定
-                if self.shared_frequency_var:
-                    try:
-                        fps = float(self.shared_frequency_var.get())
-                        self.frequency_controller.set_fps(fps)
-                    except ValueError:
-                        pass
-                
-                # 獲取視窗和區域資訊
-                window_info = None
-                if self.shared_window_widget:
-                    window_info = self.shared_window_widget.get_window_info()
-                
                 region = self.region_widget.get_region()
                 
-                if window_info and region:
-                    hwnd = window_info['hwnd']
-                    
-                    # 檢查是否需要重新初始化資源
-                    if (self.current_hwnd != hwnd or 
-                        self.current_region != region):
-                        
-                        self.capture_engine.cleanup_resources()
-                        success = self.capture_engine.initialize_resources(hwnd, region)
-                        
-                        if success:
-                            self.current_hwnd = hwnd
-                            self.current_region = region.copy()
-                        else:
-                            self.latest_image = None
-                            continue
-                    
+                if region:
                     # 擷取圖像
-                    captured_img = self.capture_engine.capture_region()
+                    captured_img = self.capture_engine.get_region(
+                        x=region['x'], 
+                        y=region['y'], 
+                        w=region['w'], 
+                        h=region['h']
+                    )
                     
                     if captured_img:
                         self.latest_image = captured_img
@@ -160,13 +118,10 @@ class GameMonitorTab:
                         self.parent.after(0, lambda: self.preview_widget.set_message("擷取失敗"))
                 else:
                     self.parent.after(0, lambda: self.preview_widget.set_message("請選擇視窗和設定區域"))
-                
-                # 頻率控制
-                self.frequency_controller.wait()
-                
+
             except Exception as e:
                 logger.error(f"{self.tab_name} 擷取錯誤: {e}")
-                time.sleep(1.0)
+            time.sleep(1 /  float(self.shared_frequency_var.get()) if self.shared_frequency_var else 1)
         
         # 清理資源
         self.capture_engine.cleanup_resources()

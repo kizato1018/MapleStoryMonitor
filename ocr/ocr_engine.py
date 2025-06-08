@@ -23,23 +23,26 @@ class OCREngine:
         self.ocr_thread = None
         self.last_ocr_time = 0
         self.ocr_interval = 0.1  # OCR處理最小間隔（秒）
+        self.tabs_order = None
         
         # 回調函數：當OCR結果更新時調用
         self.result_callback: Optional[Callable[[str, str], None]] = None
     
-    def initialize(self) -> None:
+    def initialize(self, tabs_order: Optional[List[str]] = None) -> None:
         """初始化OCR引擎（異步）"""
         if self.is_initialized or self.ocr_reader is not None:
             logger.info("OCR引擎已初始化，跳過重複初始化")
             return
         def init_thread():
             try:
+                self.tabs_order = tabs_order
                 import easyocr
                 warnings.filterwarnings("ignore", message="'pin_memory' argument is set as true but no accelerator is found")
                 logger.info("正在初始化OCR引擎...")
                 self.ocr_reader = easyocr.Reader(['en'], gpu=False)
                 self.is_initialized = True
                 logger.info("OCR引擎初始化完成")
+                self.is_running = True
             except ImportError:
                 logger.error("錯誤: 未安裝easyocr。請執行: pip install easyocr")
             except Exception as e:
@@ -56,14 +59,6 @@ class OCREngine:
         """
         self.result_callback = callback
     
-    def start_ocr_loop(self) -> None:
-        """標記OCR引擎為運行狀態"""
-        self.is_running = True
-        # 不需要額外的線程循環
-
-    def stop_ocr_loop(self) -> None:
-        """停止OCR處理"""
-        self.is_running = False
     
     def process_images(self, images_dict: Dict[str, Image.Image]) -> None:
         """
@@ -167,7 +162,6 @@ class OCREngine:
             Tuple[Image.Image, Dict]: (合併後的圖像, 各標籤的位置信息)
         """
         # 按固定順序處理圖像（參考原始代碼）
-        tab_order = ["HP", "MP", "EXP"]
         images_list = []
         tab_names = []
         
@@ -175,7 +169,7 @@ class OCREngine:
         max_width = 0
         total_height = 0
         
-        for tab_name in tab_order:
+        for tab_name in self.tabs_order:
             if tab_name in images_dict:
                 image = images_dict[tab_name]
                 images_list.append(image)
