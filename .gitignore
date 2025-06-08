@@ -1,0 +1,9 @@
+﻿**/__pycache__
+game_monitor_config.json
+Log
+venv
+tmp
+main.spec
+build
+dist
+.vscode
