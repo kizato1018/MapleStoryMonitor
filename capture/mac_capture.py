@@ -241,7 +241,53 @@ class MacCaptureEngine(BaseCaptureEngine):
                 if win.get('kCGWindowNumber') == window_handle:
                     bounds = win.get('kCGWindowBounds')
                     if bounds:
-                        return (int(bounds['X']), int(bounds['Y']), int(bounds['Width']), int(bounds['Height']))
+                        # 獲取邏輯座標
+                        logical_x = int(bounds['X'])
+                        logical_y = int(bounds['Y'])
+                        logical_width = int(bounds['Width'])
+                        logical_height = int(bounds['Height'])
+                        
+                        # 獲取顯示縮放因子
+                        scale_factor = self.get_display_scale_factor()
+                        logger.debug(f"顯示縮放因子: {scale_factor}")
+                        logger.debug(f"邏輯尺寸: {logical_width}x{logical_height}")
+                        
+                        # 轉換為實際像素座標
+                        actual_x = int(logical_x * scale_factor)
+                        actual_y = int(logical_y * scale_factor)
+                        actual_width = int(logical_width * scale_factor)
+                        actual_height = int(logical_height * scale_factor)
+                        
+                        logger.debug(f"實際像素尺寸: {actual_width}x{actual_height}")
+                        
+                        return (actual_x, actual_y, actual_x + actual_width, actual_y + actual_height)
             return None
-        except:
+        except Exception as e:
+            logger.error(f"獲取視窗矩形錯誤: {e}")
             return None
+    
+    @staticmethod
+    def get_display_scale_factor() -> float:
+        """獲取顯示縮放因子（靜態方法，可被外部調用）"""
+        if not PYOBJC_AVAILABLE:
+            return 1.0
+
+        try:
+            from Cocoa import NSScreen
+            main_screen = NSScreen.mainScreen()
+            if main_screen:
+                backing_scale_factor = main_screen.backingScaleFactor()
+                return float(backing_scale_factor)
+            return 1.0
+        except Exception as e:
+            logger.warning(f"無法獲取顯示縮放因子: {e}")
+            # 嘗試另一種方法
+            try:
+                import subprocess
+                result = subprocess.run(['system_profiler', 'SPDisplaysDataType'], 
+                                      capture_output=True, text=True)
+                if 'Retina' in result.stdout:
+                    return 2.0  # 大多數 Retina 顯示器
+                return 1.0
+            except:
+                return 2.0  # 預設為 2.0，因為大多數現代 Mac 都是 Retina

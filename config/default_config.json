@@ -1,7 +1,7 @@
 {
   "global": {
     "fps": 2.0,
-    "window_title": "MapleStory Worlds-Artale (繁體中文版)",
+    "window_title": "MapleStory Worlds",
     "ocr_allow_list": "0123456789.,[]/%",
     "display_options": {
       "show_status": false,

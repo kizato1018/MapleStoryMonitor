@@ -209,7 +209,7 @@ class WindowSelectionWidget:
             try:
                 rect = self.capture_engine.get_window_rect(self.selected_hwnd)
                 if rect:
-                    # logger.debug(f"獲取視窗資訊成功: hwnd={self.selected_hwnd}, rect={rect}")
+                    logger.info(f"獲取視窗資訊成功: hwnd={self.selected_hwnd}, rect={rect}")
                     return {
                         'hwnd': self.selected_hwnd,
                         'rect': rect,

@@ -99,11 +99,40 @@ class RegionSelectionWidget:
     
     def _create_transparent_selection_window(self):
         """創建透明選取視窗"""
+        logger.info("創建透明選取視窗")
         try:
+            # 檢測平台並獲取縮放因子
+            import platform
+            self.is_macos = platform.system() == 'Darwin'
+            
+            # 獲取 macOS 的縮放因子
+            if self.is_macos:
+                try:
+                    from capture.mac_capture import MacCaptureEngine
+                    self.scale_factor = MacCaptureEngine.get_display_scale_factor()
+                    logger.info(f"macOS 縮放因子: {self.scale_factor}")
+                except:
+                    self.scale_factor = 2.0  # 預設值
+                    logger.warning("無法獲取縮放因子，使用預設值 2.0")
+            else:
+                self.scale_factor = 1.0
+            
             self.selection_window = tk.Toplevel(self.parent)
             self.selection_window.title("選取擷取區域")
             self.selection_window.attributes('-topmost', True)
-            self.selection_window.attributes('-fullscreen', True)
+            
+            if self.is_macos:  # macOS
+                # 獲取螢幕尺寸
+                screen_width = self.selection_window.winfo_screenwidth()
+                screen_height = self.selection_window.winfo_screenheight()
+                
+                # 移除視窗裝飾並設定為螢幕大小
+                self.selection_window.overrideredirect(True)
+                self.selection_window.geometry(f"{screen_width}x{screen_height}+0+0")
+            else:
+                # 其他系統使用原來的 fullscreen
+                self.selection_window.attributes('-fullscreen', True)
+            
             self.selection_window.attributes('-alpha', 0.3)  # 半透明
             self.selection_window.configure(bg='black', cursor="cross")
             
@@ -119,19 +148,29 @@ class RegionSelectionWidget:
             # 初始化矩形ID
             self.rect_id = None
             
-            # 繪製目標視窗邊框
+            # 繪製目標視窗邊框（需要考慮縮放因子）
             if hasattr(self, 'target_rect') and self.target_rect:
                 left, top, right, bottom = self.target_rect
                 
+                # 在 macOS 上，目標視窗座標已經是實際像素座標，但畫布是邏輯座標
+                if self.is_macos:
+                    # 將實際像素座標轉換為邏輯座標用於畫布顯示
+                    canvas_left = left / self.scale_factor
+                    canvas_top = top / self.scale_factor
+                    canvas_right = right / self.scale_factor
+                    canvas_bottom = bottom / self.scale_factor
+                else:
+                    canvas_left, canvas_top, canvas_right, canvas_bottom = left, top, right, bottom
+                
                 # 繪製目標視窗區域為較亮的顏色
                 self.selection_canvas.create_rectangle(
-                    left, top, right, bottom,
+                    canvas_left, canvas_top, canvas_right, canvas_bottom,
                     outline="green", width=3, fill="gray30"
                 )
                 
                 # 顯示視窗提示
                 self.selection_canvas.create_text(
-                    left + 10, top - 30,
+                    canvas_left + 10, max(10, canvas_top - 30),
                     text="目標視窗 - 請在此區域內選取",
                     fill="green",
                     font=("Arial", 14, "bold"),
@@ -163,7 +202,7 @@ class RegionSelectionWidget:
             import traceback
             traceback.print_exc()
             messagebox.showerror("錯誤", f"無法創建選取視窗: {e}")
-    
+
     def _on_mouse_down(self, event):
         """滑鼠按下"""
         try:
@@ -189,31 +228,46 @@ class RegionSelectionWidget:
                 outline="red", width=2, fill="red", stipple="gray50"
             )
             
+            # 計算螢幕座標（考慮縮放因子）
+            if self.is_macos:
+                # 將畫布座標轉換為實際螢幕像素座標
+                screen_start_x = self.start_x * self.scale_factor
+                screen_start_y = self.start_y * self.scale_factor
+                screen_event_x = event.x * self.scale_factor
+                screen_event_y = event.y * self.scale_factor
+            else:
+                screen_start_x = self.start_x
+                screen_start_y = self.start_y
+                screen_event_x = event.x
+                screen_event_y = event.y
+            
             # 計算相對於目標視窗的座標
             if hasattr(self, 'target_rect') and self.target_rect:
                 window_left, window_top, window_right, window_bottom = self.target_rect
                 
                 # 轉換為相對座標
-                rel_x1 = min(self.start_x, event.x) - window_left
-                rel_y1 = min(self.start_y, event.y) - window_top
-                rel_x2 = max(self.start_x, event.x) - window_left
-                rel_y2 = max(self.start_y, event.y) - window_top
+                rel_x1 = min(screen_start_x, screen_event_x) - window_left
+                rel_y1 = min(screen_start_y, screen_event_y) - window_top
+                rel_x2 = max(screen_start_x, screen_event_x) - window_left
+                rel_y2 = max(screen_start_y, screen_event_y) - window_top
                 
                 # 驗證並修正座標
                 window_width = window_right - window_left
                 window_height = window_bottom - window_top
                 rel_x1, rel_y1, w, h = validate_region(
-                    rel_x1, rel_y1, rel_x2 - rel_x1, rel_y2 - rel_y1,
+                    int(rel_x1), int(rel_y1), int(rel_x2 - rel_x1), int(rel_y2 - rel_y1),
                     window_width, window_height
                 )
                 
                 coord_text = f"相對座標 X:{rel_x1}, Y:{rel_y1}, W:{w}, H:{h}"
+                if self.is_macos:
+                    coord_text += f"\n縮放因子: {self.scale_factor}"
             else:
                 # 如果沒有目標視窗，使用絕對座標
-                x1, y1 = min(self.start_x, event.x), min(self.start_y, event.y)
-                x2, y2 = max(self.start_x, event.x), max(self.start_y, event.y)
-                w, h = x2 - x1, y2 - y1
-                coord_text = f"絕對座標 X:{x1}, Y:{y1}, W:{w}, H:{h}"
+                x1, y1 = min(screen_start_x, screen_event_x), min(screen_start_y, screen_event_y)
+                x2, y2 = max(screen_start_x, screen_event_x), max(screen_start_y, screen_event_y)
+                w, h = int(x2 - x1), int(y2 - y1)
+                coord_text = f"絕對座標 X:{int(x1)}, Y:{int(y1)}, W:{w}, H:{h}"
             
             # 移除之前的座標文字
             self.selection_canvas.delete("coord_text")
@@ -254,14 +308,27 @@ class RegionSelectionWidget:
                 coords = self.selection_canvas.coords(self.rect_id)
                 if len(coords) == 4:
                     x1, y1, x2, y2 = coords
+                    
+                    # 轉換為螢幕座標（考慮縮放因子）
+                    if self.is_macos:
+                        screen_x1 = min(x1, x2) * self.scale_factor
+                        screen_y1 = min(y1, y2) * self.scale_factor
+                        screen_x2 = max(x1, x2) * self.scale_factor
+                        screen_y2 = max(y1, y2) * self.scale_factor
+                    else:
+                        screen_x1 = min(x1, x2)
+                        screen_y1 = min(y1, y2)
+                        screen_x2 = max(x1, x2)
+                        screen_y2 = max(y1, y2)
+                    
                     # 計算相對於目標視窗的座標
                     if hasattr(self, 'target_rect') and self.target_rect:
                         window_left, window_top, window_right, window_bottom = self.target_rect
                         # 轉換為相對座標
-                        rel_x = int(min(x1, x2) - window_left)
-                        rel_y = int(min(y1, y2) - window_top)
-                        w = int(abs(x2 - x1))
-                        h = int(abs(y2 - y1))
+                        rel_x = int(screen_x1 - window_left)
+                        rel_y = int(screen_y1 - window_top)
+                        w = int(screen_x2 - screen_x1)
+                        h = int(screen_y2 - screen_y1)
                         # 驗證並修正座標
                         window_width = window_right - window_left
                         window_height = window_bottom - window_top
@@ -273,10 +340,10 @@ class RegionSelectionWidget:
                         self._close_selection_window()
                     else:
                         # 沒有目標視窗時使用絕對座標
-                        x = int(min(x1, x2))
-                        y = int(min(y1, y2))
-                        w = int(abs(x2 - x1))
-                        h = int(abs(y2 - y1))
+                        x = int(screen_x1)
+                        y = int(screen_y1)
+                        w = int(screen_x2 - screen_x1)
+                        h = int(screen_y2 - screen_y1)
                         self.set_region(x, y, w, h)
                         logger.info(f"設定區域: x={x}, y={y}, w={w}, h={h}")
                         self._close_selection_window()
