@@ -50,7 +50,7 @@ class WindowSelectionWidget:
         ttk.Label(title_frame, text="視窗標題:").pack(side=tk.LEFT, padx=(0, 5))
         
         # 先放置按鈕，確保其寬度固定且優先顯示
-        self.toggle_button = ttk.Button(title_frame, text="展開列表", command=self._toggle_window_list, width=10)
+        self.toggle_button = ttk.Button(title_frame, text="▼", command=self._toggle_window_list, width=1)
         self.toggle_button.pack(side=tk.RIGHT, padx=(5, 0))
         
         # 輸入框放在中間，會自動填充剩餘空間
@@ -78,11 +78,11 @@ class WindowSelectionWidget:
         """展開/收起視窗列表"""
         if self.is_expanded:
             self.list_frame.pack_forget()
-            self.toggle_button.config(text="展開列表")
+            self.toggle_button.config(text="▼")
             self.is_expanded = False
         else:
             self.list_frame.pack(fill=tk.X, pady=5)
-            self.toggle_button.config(text="收起列表")
+            self.toggle_button.config(text="▲")
             self.is_expanded = True
             self._refresh_window_list()
     

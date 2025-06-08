@@ -83,12 +83,42 @@ class RegionSelectionWidget:
         
         # 創建透明選取視窗
         try:
-            # 嘗試將目標視窗置前（僅Windows）
+            # 嘗試將目標視窗置前
             try:
-                import win32gui
-                win32gui.SetForegroundWindow(self.target_hwnd)
-                time.sleep(0.1)
-            except:
+                import platform
+                if platform.system() == 'Windows':
+                    # Windows 版本
+                    import win32gui
+                    win32gui.SetForegroundWindow(self.target_hwnd)
+                    time.sleep(0.1)
+                elif platform.system() == 'Darwin':
+                    # macOS 版本
+                    try:
+                        from Cocoa import NSWorkspace, NSRunningApplication
+                        from Quartz import CGWindowListCopyWindowInfo, kCGWindowListOptionIncludingWindow
+                        
+                        # 獲取視窗資訊以找到對應的應用程式
+                        window_list = CGWindowListCopyWindowInfo(
+                            kCGWindowListOptionIncludingWindow,
+                            self.target_hwnd
+                        )
+                        
+                        for window_info in window_list:
+                            if window_info.get('kCGWindowNumber') == self.target_hwnd:
+                                owner_pid = window_info.get('kCGWindowOwnerPID')
+                                if owner_pid:
+                                    # 透過 PID 獲取應用程式並置前
+                                    app = NSRunningApplication.runningApplicationWithProcessIdentifier_(owner_pid)
+                                    if app:
+                                        app.activateWithOptions_(0)  # NSApplicationActivateIgnoringOtherApps
+                                        time.sleep(0.1)
+                                        logger.debug(f"成功將應用程式置前 (PID: {owner_pid})")
+                                        break
+                                break
+                    except Exception as mac_error:
+                        logger.warning(f"macOS 視窗置前失敗: {mac_error}")
+            except Exception as e:
+                logger.warning(f"視窗置前失敗: {e}")
                 pass  # 跨平台兼容
             
             # 創建透明選取視窗
@@ -99,7 +129,6 @@ class RegionSelectionWidget:
     
     def _create_transparent_selection_window(self):
         """創建透明選取視窗"""
-        logger.info("創建透明選取視窗")
         try:
             # 檢測平台並獲取縮放因子
             import platform
@@ -110,7 +139,7 @@ class RegionSelectionWidget:
                 try:
                     from capture.mac_capture import MacCaptureEngine
                     self.scale_factor = MacCaptureEngine.get_display_scale_factor()
-                    logger.info(f"macOS 縮放因子: {self.scale_factor}")
+                    logger.debug(f"macOS 縮放因子: {self.scale_factor}")
                 except:
                     self.scale_factor = 2.0  # 預設值
                     logger.warning("無法獲取縮放因子，使用預設值 2.0")
@@ -126,9 +155,10 @@ class RegionSelectionWidget:
                 screen_width = self.selection_window.winfo_screenwidth()
                 screen_height = self.selection_window.winfo_screenheight()
                 
-                # 移除視窗裝飾並設定為螢幕大小
+                # 在 macOS 上不使用 overrideredirect，改用其他方式
                 self.selection_window.overrideredirect(True)
                 self.selection_window.geometry(f"{screen_width}x{screen_height}+0+0")
+
             else:
                 # 其他系統使用原來的 fullscreen
                 self.selection_window.attributes('-fullscreen', True)
@@ -182,19 +212,28 @@ class RegionSelectionWidget:
             self.selection_canvas.bind("<B1-Motion>", self._on_mouse_drag)
             self.selection_canvas.bind("<ButtonRelease-1>", self._on_mouse_up)
             
-            # 綁定鍵盤事件
+            # 綁定鍵盤事件 - 同時綁定到視窗和畫布
             self.selection_window.bind("<Escape>", self._cancel_selection)
             self.selection_window.bind("<Return>", self._confirm_selection)
-            self.selection_window.focus_set()
+            self.selection_canvas.bind("<Escape>", self._cancel_selection)
+            self.selection_canvas.bind("<Return>", self._confirm_selection)
+            
+            # 確保視窗能接收鍵盤事件
+            self.selection_window.focus_force()
+            self.selection_canvas.focus_set()
+            
+            # 在 macOS 上額外處理焦點
+            if self.is_macos:
+                self.selection_window.after(100, self._ensure_focus)
             
             # 添加說明文字
             self.selection_canvas.create_text(
                 50, 50,
-                text="拖拽選取區域（相對於綠色目標視窗），按Enter確認，按ESC取消",
+                text="拖拽選取區域（相對於綠色目標視窗），按Enter確認，按ESC取消\n在 macOS 上，如果按鍵無效，請點擊畫布後再試",
                 fill="white",
                 font=("Arial", 16, "bold"),
                 anchor=tk.NW,
-                width=500
+                width=600
             )
             
         except Exception as e:
@@ -202,12 +241,39 @@ class RegionSelectionWidget:
             import traceback
             traceback.print_exc()
             messagebox.showerror("錯誤", f"無法創建選取視窗: {e}")
+    
+    def _ensure_focus(self):
+        """確保視窗獲得焦點（macOS 專用）"""
+        try:
+            self.selection_window.lift()
+            self.selection_window.focus_force()
+            self.selection_canvas.focus_set()
+            # 讓視窗可以接收所有事件
+            self.selection_canvas.bind("<Key>", self._on_key_press)
+            logger.debug("macOS 焦點設定完成")
+        except Exception as e:
+            logger.warning(f"設定焦點失敗: {e}")
+    
+    def _on_key_press(self, event):
+        """處理鍵盤按鍵"""
+        try:
+            logger.debug(f"按鍵事件: {event.keysym}")
+            if event.keysym == 'Escape':
+                self._cancel_selection()
+            elif event.keysym == 'Return':
+                self._confirm_selection()
+        except Exception as e:
+            logger.error(f"按鍵處理錯誤: {e}")
 
     def _on_mouse_down(self, event):
         """滑鼠按下"""
         try:
             self.start_x = event.x
             self.start_y = event.y
+            
+            # 在 macOS 上，滑鼠點擊時重新設定焦點
+            if self.is_macos:
+                self.selection_canvas.focus_set()
             
             # 清除之前的矩形
             if self.rect_id:
@@ -265,7 +331,7 @@ class RegionSelectionWidget:
             else:
                 # 如果沒有目標視窗，使用絕對座標
                 x1, y1 = min(screen_start_x, screen_event_x), min(screen_start_y, screen_event_y)
-                x2, y2 = max(screen_start_x, screen_event_x), max(screen_start_y, screen_event_y)
+                x2, y2 = max(screen_start_x, screen_event_x), max(screen_start_y, event.y)
                 w, h = int(x2 - x1), int(y2 - y1)
                 coord_text = f"絕對座標 X:{int(x1)}, Y:{int(y1)}, W:{w}, H:{h}"
             
@@ -335,7 +401,7 @@ class RegionSelectionWidget:
                         rel_x, rel_y, w, h = validate_region(rel_x, rel_y, w, h, window_width, window_height)
                         # 設定區域
                         self.set_region(rel_x, rel_y, w, h)
-                        logger.info(f"設定區域: x={rel_x}, y={rel_y}, w={w}, h={h}")
+                        logger.debug(f"設定區域: x={rel_x}, y={rel_y}, w={w}, h={h}")
                         # 關閉選取視窗
                         self._close_selection_window()
                     else:
@@ -345,7 +411,7 @@ class RegionSelectionWidget:
                         w = int(screen_x2 - screen_x1)
                         h = int(screen_y2 - screen_y1)
                         self.set_region(x, y, w, h)
-                        logger.info(f"設定區域: x={x}, y={y}, w={w}, h={h}")
+                        logger.debug(f"設定區域: x={x}, y={y}, w={w}, h={h}")
                         self._close_selection_window()
             else:
                 messagebox.showwarning("警告", "請先選取一個區域")

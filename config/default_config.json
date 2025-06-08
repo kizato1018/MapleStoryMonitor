@@ -6,6 +6,8 @@
     "display_options": {
       "show_status": false,
       "show_tracker": true,
+      "window_pinned": true,
+      "window_transparency": 1.0,
       "tab_visibility": {
         "HP": true,
         "MP": true,

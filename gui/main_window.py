@@ -34,10 +34,10 @@ class GameMonitorMainWindow:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("遊戲狀態監控")
-        self.root.geometry("350x550")
+        self.root.geometry("380x580")
         
         # 設定最小視窗大小
-        self.root.minsize(350, 550)  # 最小寬度350，最小高度500以確保內容不被遮擋
+        self.root.minsize(380, 580)  # 最小寬度350，最小高度500以確保內容不被遮擋
         
         # 配置管理器
         self.config_manager = ConfigManager()
@@ -56,6 +56,8 @@ class GameMonitorMainWindow:
         # 顯示選項變數
         self.show_status_var = tk.BooleanVar(value=True)
         self.show_tracker_var = tk.BooleanVar(value=True)
+        self.window_pinned_var = tk.BooleanVar(value=False)
+        self.window_transparency_var = tk.DoubleVar(value=1.0)  # 1.0 = 完全不透明, 0.0 = 完全透明
         
         # 分頁顯示選項變數
         self.tab_visibility_vars = {
@@ -129,14 +131,18 @@ class GameMonitorMainWindow:
             self.fps_var,
             self.show_status_var,
             self.show_tracker_var,
-            self.tab_visibility_vars
+            self.tab_visibility_vars,
+            self.window_pinned_var,
+            self.window_transparency_var
         )
         
         # 設定回調函數
         self.settings_tab.set_callbacks(
             self._update_status_visibility,
             self._update_tracker_visibility,
-            self._apply_tab_visibility_changes
+            self._apply_tab_visibility_changes,
+            self._update_window_pinning,
+            self._update_window_transparency
         )
         
         # 創建設定頁面內容
@@ -228,10 +234,34 @@ class GameMonitorMainWindow:
                 self.multi_tracker_frame.pack_forget()
         self._save_config_if_ready()
     
+    def _update_window_pinning(self):
+        """更新視窗釘選狀態"""
+        try:
+            is_pinned = self.window_pinned_var.get()
+            self.root.attributes('-topmost', is_pinned)
+            logger.info(f"視窗釘選狀態已更新: {'已釘選' if is_pinned else '已取消釘選'}")
+        except Exception as e:
+            logger.error(f"更新視窗釘選狀態時發生錯誤: {e}")
+        self._save_config_if_ready()
+
+    def _update_window_transparency(self):
+        """更新視窗透明度"""
+        try:
+            transparency = self.window_transparency_var.get()
+            # 確保透明度在有效範圍內 (0.1 到 1.0)
+            transparency = max(0.1, min(1.0, transparency))
+            self.root.attributes('-alpha', transparency)
+            logger.info(f"視窗透明度已更新: {transparency:.1%}")
+        except Exception as e:
+            logger.error(f"更新視窗透明度時發生錯誤: {e}")
+        self._save_config_if_ready()
+
     def _init_visibility(self):
         self._update_status_visibility()
         self._update_tracker_visibility()
-    
+        self._update_window_pinning()
+        self._update_window_transparency()
+
     def _apply_tab_visibility_changes(self):
         """應用分頁可見性變更"""
         # 儲存當前的 notebook 索引
@@ -522,6 +552,8 @@ class GameMonitorMainWindow:
             display_config = global_config.get('display_options', {})
             self.show_status_var.set(display_config.get('show_status', True))
             self.show_tracker_var.set(display_config.get('show_tracker', True))
+            self.window_pinned_var.set(display_config.get('window_pinned', False))
+            self.window_transparency_var.set(display_config.get('window_transparency', 1.0))
             
             # 載入分頁可見性配置
             tab_visibility = display_config.get('tab_visibility', {})
@@ -568,6 +600,8 @@ class GameMonitorMainWindow:
         # 綁定顯示選項變數的回調
         self.show_status_var.trace('w', lambda *args: self._save_config_if_ready())
         self.show_tracker_var.trace('w', lambda *args: self._save_config_if_ready())
+        self.window_pinned_var.trace('w', lambda *args: self._save_config_if_ready())
+        self.window_transparency_var.trace('w', lambda *args: self._save_config_if_ready())
         
         # 綁定分頁可見性變數的回調
         for var in self.tab_visibility_vars.values():
@@ -620,6 +654,8 @@ class GameMonitorMainWindow:
         display_options = {
             'show_status': self.show_status_var.get(),
             'show_tracker': self.show_tracker_var.get(),
+            'window_pinned': self.window_pinned_var.get(),
+            'window_transparency': self.window_transparency_var.get(),
             'tab_visibility': {
                 tab_name: var.get() 
                 for tab_name, var in self.tab_visibility_vars.items()
