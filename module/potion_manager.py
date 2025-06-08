@@ -15,6 +15,7 @@ class PotionManager:
         self.total_used = 0  # 累計總使用量
         self.unit_cost = 0  # 藥水單價
         self.last_potion_value = None  # 上一次的藥水值，用於檢測補充
+        self.error_threshold = 50  # 當前值小於上一次值的容錯範圍，默認為10個單位
 
     def start_tracking(self):
         """開始追蹤藥水使用量"""
@@ -90,7 +91,8 @@ class PotionManager:
                 
                 # 檢測正常使用：當前值小於上一次值
                 elif (self.last_potion_value is not None and 
-                      calc_value < self.last_potion_value):
+                      self.last_potion_value > calc_value and
+                      self.last_potion_value - calc_value < self.error_threshold):
                     used_amount = self.last_potion_value - calc_value
                     self.total_used += used_amount
                 
