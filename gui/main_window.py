@@ -609,18 +609,18 @@ class GameMonitorMainWindow:
     def _bind_config_callbacks(self):
         """綁定配置回調函數"""
         # 綁定FPS變數的回調
-        self.fps_var.trace('w', lambda *args: self._save_config_if_ready())
-        self.fps_var.trace('w', self._update_fps_label)
+        self.fps_var.trace_add('write', lambda *args: self._save_config_if_ready())
+        self.fps_var.trace_add('write', self._update_fps_label)
         
         # 綁定顯示選項變數的回調
-        self.show_status_var.trace('w', lambda *args: self._save_config_if_ready())
-        self.show_tracker_var.trace('w', lambda *args: self._save_config_if_ready())
-        self.window_pinned_var.trace('w', lambda *args: self._save_config_if_ready())
-        self.window_transparency_var.trace('w', lambda *args: self._save_config_if_ready())
+        self.show_status_var.trace_add('write', lambda *args: self._save_config_if_ready())
+        self.show_tracker_var.trace_add('write', lambda *args: self._save_config_if_ready())
+        self.window_pinned_var.trace_add('write', lambda *args: self._save_config_if_ready())
+        self.window_transparency_var.trace_add('write', lambda *args: self._save_config_if_ready())
         
         # 綁定分頁可見性變數的回調
         for var in self.tab_visibility_vars.values():
-            var.trace('w', lambda *args: self._save_config_if_ready())
+            var.trace_add('write', lambda *args: self._save_config_if_ready())
         
         # 綁定視窗選擇控件的回調
         if self.settings_widget:
@@ -631,7 +631,7 @@ class GameMonitorMainWindow:
             
             # 綁定視窗標題變數
             if hasattr(self.settings_widget, 'window_title_var'):
-                self.settings_widget.window_title_var.trace('w', lambda *args: self._save_config_if_ready())
+                self.settings_widget.window_title_var.trace_add('write', lambda *args: self._save_config_if_ready())
         
         # 綁定設定標籤頁的回調
         if self.settings_tab:
@@ -645,7 +645,7 @@ class GameMonitorMainWindow:
             if hasattr(tab, 'region_widget'):
                 for var in [tab.region_widget.x_var, tab.region_widget.y_var, 
                            tab.region_widget.w_var, tab.region_widget.h_var]:
-                    var.trace('w', lambda *args: self._save_config_if_ready())
+                    var.trace_add('write', lambda *args: self._save_config_if_ready())
 
     def _save_config_if_ready(self):
         """只有在配置載入完成後才保存配置"""

@@ -17,7 +17,7 @@ class FrequencyControlWidget:
         self.frequency_var = tk.StringVar(value="5.0")
         
         if self.config_callback:
-            self.frequency_var.trace('w', lambda *args: self.config_callback())
+            self.frequency_var.trace_add('write''w', lambda *args: self.config_callback())
         
         self._create_widget()
     
@@ -34,7 +34,7 @@ class FrequencyControlWidget:
         self.freq_label = ttk.Label(self.frame, text="")
         self.freq_label.pack(anchor=tk.W, pady=(5, 0))
         
-        self.frequency_var.trace('w', self._update_freq_label)
+        self.frequency_var.trace_add('write''w', self._update_freq_label)
         self._update_freq_label()
     
     def _update_freq_label(self, *args):

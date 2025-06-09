@@ -8,3 +8,5 @@ build
 dist
 .vscode
 run.lnk
+.DS_Store
+run.command

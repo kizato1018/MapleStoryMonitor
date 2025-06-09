@@ -53,7 +53,11 @@ success_msg "已找到 $PYTHON_VERSION"
 
 # 檢查 Python 版本是否符合要求
 PYTHON_VERSION_NUM=$($PYTHON_CMD -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-if (( $(echo "$PYTHON_VERSION_NUM < 3.8" | bc -l) )); then
+PYTHON_MAJOR=$($PYTHON_CMD -c "import sys; print(sys.version_info.major)")
+PYTHON_MINOR=$($PYTHON_CMD -c "import sys; print(sys.version_info.minor)")
+
+# 檢查版本：主版本號必須是3，次版本號必須>=8
+if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 8 ]); then
     error_exit "Python 版本過舊 ($PYTHON_VERSION_NUM)，需要 Python 3.8 或更新版本"
 fi
 
@@ -75,7 +79,8 @@ if [ -d "venv" ]; then
     echo "  2. 保留現有環境 - 跳過虛擬環境建立"
     echo "  3. 取消安裝"
     echo
-    read -p "請輸入選擇 (1/2/3): " choice
+    printf "請輸入選擇 (1/2/3): "
+    read choice
     
     case $choice in
         1)
@@ -164,33 +169,20 @@ python -m pip install -r requirements.txt || error_exit "安裝依賴套件失�
 
 # 創建啟動腳本
 info_msg "[8/8] 創建啟動腳本..."
-cat > run.sh << 'EOF'
+cat > run.command << 'EOF'
 #!/bin/bash
 # MapleStory Monitor 啟動腳本
 
 # 獲取腳本所在目錄
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+SCRIPT_PATH="$(pwd)/venv/bin/python3 $(pwd)/main.py"
 
-echo "啟動 MapleStory Monitor..."
-
-# 啟動虛擬環境
-source venv/bin/activate
-
-# 執行程序
-python main.py
-
-# 檢查執行結果
-if [ $? -ne 0 ]; then
-    echo
-    echo "[錯誤] 程序執行失敗"
-    echo "按 Enter 鍵退出..."
-    read
-fi
+osascript -e "do shell script \"$SCRIPT_PATH > /dev/null 2>&1 &\""
 EOF
 
 # 設定執行權限
-chmod +x run.sh
+chmod +x run.command
 
 echo
 echo "================================================"
@@ -198,14 +190,12 @@ echo "           🎉 安裝完成！ 🎉"
 echo "================================================"
 echo
 echo "使用方法："
-echo "  • 在終端機中執行: ./run.sh"
-echo "  • 或雙擊 run.sh 檔案（需要設定預設應用程式為終端機）"
+echo "  • 在終端機中執行: ./run.command"
+echo "  • 或雙擊 run.command 檔案（當程式啟動以後，啟動的終端機可以關閉）"
 echo
 echo "注意事項："
 echo "  • 請確保 MapleStory 遊戲已啟動"
 echo "  • 首次使用需要設定視窗選擇和監控區域"
 echo "  • 可能需要允許應用程式擷取螢幕畫面的權限"
 echo "  • 如遇問題請查看 Log 資料夾中的記錄檔"
-echo
-echo "如需立即啟動程序，請執行: ./run.sh"
 echo
