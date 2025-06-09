@@ -34,7 +34,7 @@ class WindowSelectionWidget:
         self.capture_engine = capture_engine
         
         if self.config_callback:
-            self.window_title_var.trace('w', lambda *args: self.config_callback())
+            self.window_title_var.trace_add('write''w', lambda *args: self.config_callback())
         
         self._create_widget()
     

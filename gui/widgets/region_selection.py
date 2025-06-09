@@ -31,7 +31,7 @@ class RegionSelectionWidget:
         """綁定配置回調函數（在配置載入後調用）"""
         if self.config_callback:
             for var in [self.x_var, self.y_var, self.w_var, self.h_var]:
-                var.trace('w', lambda *args: self.config_callback())
+                var.trace_add('write''w', lambda *args: self.config_callback())
         
     def _create_widget(self):
         """創建區域選擇控制元件"""

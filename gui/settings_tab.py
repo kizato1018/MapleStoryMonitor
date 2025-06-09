@@ -194,9 +194,9 @@ class SettingsTab:
     def bind_callbacks(self):
         """綁定回調函數"""
         if self.fps_var:
-            self.fps_var.trace('w', self._update_fps_label)
+            self.fps_var.trace_add('write', self._update_fps_label)
         if self.window_transparency_var:
-            self.window_transparency_var.trace('w', self._update_transparency_label)
+            self.window_transparency_var.trace_add('write', self._update_transparency_label)
     
     def get_window_widget(self):
         """獲取視窗選擇控件"""
