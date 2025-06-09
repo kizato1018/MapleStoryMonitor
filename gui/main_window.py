@@ -9,6 +9,7 @@ import threading
 import time
 from typing import Dict, Any
 import os
+import ctypes
 
 from gui.widgets.window_selection import WindowSelectionWidget
 from gui.widgets.frequency_control import FrequencyControlWidget
@@ -34,12 +35,20 @@ class GameMonitorMainWindow:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("遊戲狀態監控")
-        self.root.geometry("380x580")
+        
+        # 配置管理器 - 移到前面以便載入視窗大小
+        self.config_manager = ConfigManager()
+        
+        # 設定初始視窗大小（稍後會被配置覆蓋）
+        self.root.geometry("0x0")
+        self.root.withdraw()
         
         # 設定視窗圖標
         try:
             import platform
             if platform.system() == "Windows":
+                myappid = 'mycompany.myapp.subapp.1.0'  # 任意唯一值
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
                 icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "icon.ico")
                 if os.path.exists(icon_path):
                     self.root.iconbitmap(icon_path)
@@ -58,10 +67,7 @@ class GameMonitorMainWindow:
             logger.warning(f"設定視窗圖標失敗: {e}")
         
         # 設定最小視窗大小
-        self.root.minsize(380, 580)  # 最小寬度350，最小高度500以確保內容不被遮擋
-        
-        # 配置管理器
-        self.config_manager = ConfigManager()
+        self.root.minsize(380, 350)  # 最小寬度350，最小高度500以確保內容不被遮擋
         
         # 數據管理器
         self.hpmp_manager = HPMPManager()
@@ -72,13 +78,14 @@ class GameMonitorMainWindow:
         # 標記是否正在載入配置（防止觸發保存）
         self.is_loading_config = True
         # 共享的FPS變數
-        self.fps_var = None
+        self.fps_var = tk.StringVar(value="5.0")
         
         # 顯示選項變數
         self.show_status_var = tk.BooleanVar(value=True)
         self.show_tracker_var = tk.BooleanVar(value=True)
         self.window_pinned_var = tk.BooleanVar(value=False)
         self.window_transparency_var = tk.DoubleVar(value=1.0)  # 1.0 = 完全不透明, 0.0 = 完全透明
+        self.auto_update_var = tk.BooleanVar(value=True)  # 新增自動更新變數
         
         # 分頁顯示選項變數
         self.tab_visibility_vars = {
@@ -120,7 +127,7 @@ class GameMonitorMainWindow:
     
     def _create_gui(self):
         """創建GUI"""
-        self.fps_var = tk.StringVar(value="5.0")
+        
 
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -154,7 +161,8 @@ class GameMonitorMainWindow:
             self.show_tracker_var,
             self.tab_visibility_vars,
             self.window_pinned_var,
-            self.window_transparency_var
+            self.window_transparency_var,
+            self.auto_update_var
         )
         
         # 設定回調函數
@@ -163,7 +171,8 @@ class GameMonitorMainWindow:
             self._update_tracker_visibility,
             self._apply_tab_visibility_changes,
             self._update_window_pinning,
-            self._update_window_transparency
+            self._update_window_transparency,
+            self._update_auto_update
         )
         
         # 創建設定頁面內容
@@ -229,7 +238,10 @@ class GameMonitorMainWindow:
         self.multi_tracker_frame = ttk.LabelFrame(self.overview_frame, text="多功能追蹤計算器", padding=10)
         self.multi_tracker_frame.pack(fill=tk.X, padx=20, pady=10)
         
-        self.multi_tracker = MultiTrackerWidget(self.multi_tracker_frame)
+        self.multi_tracker = MultiTrackerWidget(self.multi_tracker_frame, 
+                                                self.exp_manager, 
+                                                self.coin_manager, 
+                                                self.potion_manager)
         self.multi_tracker.pack(fill=tk.X)
 
     def _update_fps_label(self, *args):
@@ -276,6 +288,16 @@ class GameMonitorMainWindow:
         except Exception as e:
             logger.error(f"更新視窗透明度時發生錯誤: {e}")
         self._save_config_if_ready()
+
+    def _update_auto_update(self):
+        try:
+            auto_update = self.auto_update_var.get()
+            self.config_manager.set_auto_update(auto_update)
+            logger.info(f"自動更新狀態已更新: {'啟用' if auto_update else '禁用'}")
+        except Exception as e:
+            logger.error(f"更新自動更新狀態時發生錯誤: {e}")
+        self._save_config_if_ready()
+        
 
     def _init_visibility(self):
         self._update_status_visibility()
@@ -563,11 +585,19 @@ class GameMonitorMainWindow:
             # 載入全域配置
             global_config = self.config_manager.get_global_config()
             
+            # 載入視窗大小配置
+            window_size = self.config_manager.get_window_size()
+            self.root.geometry(f"{window_size['width']}x{window_size['height']}")
+            self.root.update_idletasks()  # 確保視窗大小更新
+            self.root.deiconify()
+            logger.info(f"載入視窗大小: {window_size['width']}x{window_size['height']}")
+            
             # 處理FPS配置（支援舊格式）
             fps = global_config.get('fps', self.config_manager.config_data.get('global_fps', 5.0))
             self.fps_var.set(str(fps))
             # 立即更新所有tab的frequency_controller
             self._update_fps_label()
+            self.auto_update_var.set(global_config.get('auto_update', True))
             
             # 載入顯示選項配置
             display_config = global_config.get('display_options', {})
@@ -608,6 +638,9 @@ class GameMonitorMainWindow:
             # 設定OCR允許字符列表
             allow_list = global_config.get('ocr_allow_list', '0123456789.[]/%')
             self.ocr_engine.set_allow_list(allow_list)
+        
+        # 配置載入完成後，啟用視窗大小變更監聽
+        self.is_window_configure_bound = True
         
         # 配置載入完成後，綁定回調函數
         self._bind_config_callbacks()
@@ -652,11 +685,30 @@ class GameMonitorMainWindow:
                 for var in [tab.region_widget.x_var, tab.region_widget.y_var, 
                            tab.region_widget.w_var, tab.region_widget.h_var]:
                     var.trace_add('write', lambda *args: self._save_config_if_ready())
+                    
+        # 綁定視窗大小變更事件
+        if hasattr(self, 'is_window_configure_bound'):
+            if self.is_window_configure_bound:
+                self.root.bind('<Configure>', lambda event: self._save_window_size())
+                self.is_window_configure_bound = False
+                logger.debug("已綁定視窗大小變更事件")
 
     def _save_config_if_ready(self):
         """只有在配置載入完成後才保存配置"""
         if not self.is_loading_config:
             self._save_config()
+
+    def _save_window_size(self):
+        """儲存視窗大小"""
+        try:
+            width = self.root.winfo_width()
+            height = self.root.winfo_height()
+            self.config_manager.set_window_size(width, height)
+            logger.debug(f"儲存視窗大小: {width}x{height}")
+            # 觸發完整配置保存
+            self._save_config()
+        except Exception as e:
+            logger.error(f"儲存視窗大小失敗: {e}")
 
     def _save_config(self):
         """儲存配置"""

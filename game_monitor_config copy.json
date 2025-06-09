@@ -1,13 +1,9 @@
 {
   "global": {
     "fps": 2.0,
-    "window_title": "MapleStory Worlds",
+    "window_title": "MapleStory Worlds-Artale (繁體中文版)",
     "ocr_allow_list": "0123456789.,[]/%",
     "auto_update": false,
-    "window_size": {
-      "width": 380,
-      "height": 720
-    },
     "display_options": {
       "show_status": true,
       "show_tracker": true,
@@ -43,15 +39,15 @@
     },
     "藥水": {
       "x": 1194,
-      "y": 637,
-      "w": 31,
-      "h": 19
+      "y": 635,
+      "w": 39,
+      "h": 27
     },
     "金幣": {
-      "x": 189,
-      "y": 596,
+      "x": 54,
+      "y": 493,
       "w": 200,
-      "h": 22
+      "h": 24
     }
   }
 }

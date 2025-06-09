@@ -176,3 +176,19 @@ class ConfigManager:
     def set_ocr_allow_list(self, allow_list: str) -> None:
         """設定OCR允許字符列表"""
         self.set_global_config("ocr_allow_list", allow_list)
+    
+    def get_auto_update(self) -> bool:
+        """獲取自動更新設定"""
+        return self.get_global_config().get("auto_update", True)
+    
+    def set_auto_update(self, auto_update: bool) -> None:
+        """設定自動更新"""
+        self.set_global_config("auto_update", auto_update)
+    
+    def get_window_size(self) -> Dict[str, int]:
+        """獲取視窗大小設定"""
+        return self.get_global_config().get("window_size", {"width": 380, "height": 700})
+    
+    def set_window_size(self, width: int, height: int) -> None:
+        """設定視窗大小"""
+        self.set_global_config("window_size", {"width": width, "height": height})

@@ -11,7 +11,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
 from gui.main_window import GameMonitorMainWindow
+from utils.updater import check_and_update
 from utils.log import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -31,4 +33,5 @@ def main():
 
 
 if __name__ == "__main__":
+    check_and_update()  # 檢查更新
     main()

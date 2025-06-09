@@ -19,7 +19,7 @@ class TrackerSubWidget:
         self.parent_frame = parent_frame
         self.title = title
         self.timer = timer
-        self.enabled = tk.BooleanVar(value=False)
+        self.enabled = tk.BooleanVar(value=True)
         self.manager = None
         
         self.main_frame = None

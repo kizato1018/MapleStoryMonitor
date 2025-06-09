@@ -43,12 +43,12 @@ class EXPTrackerWidget(TrackerSubWidget):
         
         try:
             status = self.manager.get_status()
+            logger.debug(f"更新經驗顯示: {status}")
             
             # 10分鐘經驗
             exp_10min_data = status.get("exp_10min_data")
             if exp_10min_data:
-                exp_value = exp_10min_data.get("exp_value")
-                exp_percent = exp_10min_data.get("exp_percent")
+                exp_value, exp_percent = exp_10min_data
                 display_text = self._format_exp_display(exp_value, exp_percent, "10分鐘經驗")
                 self.labels["exp_10min"].config(text=display_text)
             else:
@@ -57,8 +57,7 @@ class EXPTrackerWidget(TrackerSubWidget):
             # 總累計經驗
             total_exp_data = status.get("total_exp_data")
             if total_exp_data:
-                exp_value = total_exp_data.get("exp_value")
-                exp_percent = total_exp_data.get("exp_percent")
+                exp_value, exp_percent = total_exp_data
                 display_text = self._format_exp_display(exp_value, exp_percent, "總累計經驗")
                 self.labels["total_exp"].config(text=display_text)
             else:
@@ -67,9 +66,7 @@ class EXPTrackerWidget(TrackerSubWidget):
             # 預估升級時間
             estimated_levelup_data = status.get("estimated_levelup_data")
             if estimated_levelup_data:
-                hours = estimated_levelup_data.get("hours", 0)
-                minutes = estimated_levelup_data.get("minutes", 0)
-                seconds = estimated_levelup_data.get("seconds", 0)
+                hours, minutes, seconds = estimated_levelup_data
                 display_text = self._format_time_display(hours, minutes, seconds)
                 self.labels["levelup_time"].config(text=display_text)
             else:

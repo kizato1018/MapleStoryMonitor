@@ -26,9 +26,9 @@ class MultiTrackerWidget:
         self.timer = MonitorTimer()  # 共用計時器
         
         # 管理器實例
-        self.exp_manager = exp_manager if exp_manager else EXPManager()
-        self.coin_manager = coin_manager if coin_manager else CoinManager()
-        self.potion_manager = potion_manager if potion_manager else PotionManager()
+        self.exp_manager = exp_manager
+        self.coin_manager = coin_manager
+        self.potion_manager = potion_manager
         
         # 將共用計時器設定給各管理器
         self.exp_manager.timer = self.timer

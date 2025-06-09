@@ -25,12 +25,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [1/7] 檢查 Python 版本...
+echo [1/8] 檢查 Python 版本...
 for /f "tokens=2" %%i in ('python --version') do set PYTHON_VERSION=%%i
 echo 已找到 Python %PYTHON_VERSION%
 
 :: 檢查 pip
-echo [2/7] 檢查 pip...
+echo [2/8] 檢查 pip...
 python -m pip --version >nul 2>&1
 if errorlevel 1 (
     echo [錯誤] pip 未正確安裝
@@ -40,7 +40,7 @@ if errorlevel 1 (
 echo pip 檢查完成
 
 :: 清理舊的虛擬環境
-echo [3/7] 清理舊環境...
+echo [3/8] 清理舊環境...
 if exist "venv" (
     echo.
     echo 偵測到舊的虛擬環境！
@@ -99,7 +99,7 @@ if exist "venv" (
 )
 
 :: 創建虛擬環境
-echo [4/7] 創建虛擬環境...
+echo [4/8] 創建虛擬環境...
 :reinstall_env
 python -m venv venv
 if errorlevel 1 (
@@ -117,7 +117,7 @@ timeout /t 2 /nobreak >nul
 echo 虛擬環境創建成功
 
 :: 檢查虛擬環境是否正常
-echo [5/7] 檢查虛擬環境...
+echo [5/8] 檢查虛擬環境...
 if not exist "venv\Scripts\python.exe" (
     echo [錯誤] 虛擬環境建立不完整
     echo 請檢查防毒軟體設定或嘗試以管理員權限執行
@@ -126,7 +126,7 @@ if not exist "venv\Scripts\python.exe" (
 )
 
 :: 啟動虛擬環境並升級 pip
-echo [6/7] 啟動虛擬環境並升級 pip...
+echo [6/8] 啟動虛擬環境並升級 pip...
 call venv\Scripts\activate.bat
 if errorlevel 1 (
     echo [錯誤] 無法啟動虛擬環境
@@ -138,7 +138,7 @@ if errorlevel 1 (
 
 :: 安裝依賴套件
 :install_packages
-echo [7/7] 安裝依賴套件...
+echo [7/8] 安裝依賴套件...
 echo 這可能需要幾分鐘時間，請耐心等待...
 
 :: 確保在正確的目錄
@@ -162,7 +162,7 @@ if errorlevel 1 (
 )
 
 :: 創建啟動腳本
-echo 創建啟動腳本...
+echo [8/8] 創建啟動腳本...
 
 :: 創建 VBS 腳本來生成捷徑
 (

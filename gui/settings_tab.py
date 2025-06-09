@@ -25,6 +25,7 @@ class SettingsTab:
         self.show_tracker_var = None
         self.window_pinned_var = None
         self.window_transparency_var = None
+        self.auto_update_var = None
         self.tab_visibility_vars = None
         self.shared_window_widget = None
         
@@ -32,7 +33,7 @@ class SettingsTab:
         self.fps_label = None
         self.transparency_label = None
         
-    def set_variables(self, shared_fps_var, show_status_var, show_tracker_var, tab_visibility_vars, window_pinned_var=None, window_transparency_var=None):
+    def set_variables(self, shared_fps_var, show_status_var, show_tracker_var, tab_visibility_vars, window_pinned_var=None, window_transparency_var=None, auto_update_var=None):
         """設定從主視窗傳入的變數"""
         self.fps_var = shared_fps_var
         self.show_status_var = show_status_var
@@ -40,19 +41,21 @@ class SettingsTab:
         self.tab_visibility_vars = tab_visibility_vars
         self.window_pinned_var = window_pinned_var
         self.window_transparency_var = window_transparency_var
+        self.auto_update_var = auto_update_var
         
-    def set_callbacks(self, update_status_visibility, update_tracker_visibility, apply_tab_visibility_changes, update_window_pinning=None, update_window_transparency=None):
+    def set_callbacks(self, update_status_visibility, update_tracker_visibility, apply_tab_visibility_changes, update_window_pinning=None, update_window_transparency=None, update_auto_update=None):
         """設定回調函數"""
         self.update_status_visibility = update_status_visibility
         self.update_tracker_visibility = update_tracker_visibility
         self.apply_tab_visibility_changes = apply_tab_visibility_changes
         self.update_window_pinning = update_window_pinning
         self.update_window_transparency = update_window_transparency
+        self.update_auto_update = update_auto_update
 
     def create_tab(self):
         """創建設定標籤頁內容"""
         # 視窗選擇
-        window_frame = ttk.LabelFrame(self.parent_frame, text="目標視窗選擇", padding=5)
+        window_frame = ttk.Frame(self.parent_frame)
         window_frame.pack(fill=tk.X, padx=10, pady=5)
         
         # 動態導入以避免循環導入
@@ -61,37 +64,20 @@ class SettingsTab:
         self.shared_window_widget.pack(fill=tk.X)
 
         # 全域FPS控制
-        fps_frame = ttk.LabelFrame(self.parent_frame, text="全域設定", padding=5)
-        fps_frame.pack(fill=tk.X, padx=10, pady=5)
-        fps_control_frame = ttk.Frame(fps_frame)
-        fps_control_frame.pack(fill=tk.X, pady=2)
-        ttk.Label(fps_control_frame, text="擷取頻率 (FPS):").grid(row=0, column=0, padx=2, sticky='w')
-        ttk.Entry(fps_control_frame, textvariable=self.fps_var, width=10).grid(row=0, column=1, padx=2)
-        self.fps_label = ttk.Label(fps_frame, text="", font=('Arial', 11))
-        self.fps_label.pack(anchor=tk.W, pady=(2, 0))
-        self._update_fps_label()
-        
-        # 顯示選項設定
-        display_frame = ttk.LabelFrame(self.parent_frame, text="顯示選項", padding=5)
-        display_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        ttk.Checkbutton(
-            display_frame,
-            text="顯示當前狀態",
-            variable=self.show_status_var,
-            command=self.update_status_visibility
-        ).pack(anchor=tk.W, pady=1)
-        
-        ttk.Checkbutton(
-            display_frame,
-            text="顯示追蹤計算器",
-            variable=self.show_tracker_var,
-            command=self.update_tracker_visibility
-        ).pack(anchor=tk.W, pady=1)
+        setting_frame = ttk.LabelFrame(self.parent_frame, text="設定", padding=5)
+        setting_frame.pack(fill=tk.X, padx=10, pady=5)
+        # 自動更新選項
+        if self.auto_update_var and self.update_auto_update:
+            ttk.Checkbutton(
+                setting_frame,
+                text="啟用自動更新",
+                variable=self.auto_update_var,
+                command=self.update_auto_update
+            ).pack(anchor=tk.W, pady=1)
         
         if self.window_pinned_var and self.update_window_pinning:
             ttk.Checkbutton(
-                display_frame,
+                setting_frame,
                 text="釘選視窗到最前方",
                 variable=self.window_pinned_var,
                 command=self.update_window_pinning
@@ -99,7 +85,7 @@ class SettingsTab:
         
         # 視窗透明度控制
         if self.window_transparency_var and self.update_window_transparency:
-            transparency_frame = ttk.Frame(display_frame)
+            transparency_frame = ttk.Frame(setting_frame)
             transparency_frame.pack(fill=tk.X, pady=2)
             
             ttk.Label(transparency_frame, text="視窗透明度:").pack(side=tk.LEFT, padx=(0, 5))
@@ -117,6 +103,35 @@ class SettingsTab:
             self.transparency_label = ttk.Label(transparency_frame, text="", font=('Arial', 9))
             self.transparency_label.pack(side=tk.LEFT)
             self._update_transparency_label()
+        
+        fps_control_frame = ttk.Frame(setting_frame)
+        fps_control_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(fps_control_frame, text="擷取頻率 (FPS):").grid(row=0, column=0, padx=2, sticky='w')
+        ttk.Entry(fps_control_frame, textvariable=self.fps_var, width=10).grid(row=0, column=1, padx=2)
+        self.fps_label = ttk.Label(setting_frame, text="", font=('Arial', 8))
+        self.fps_label.pack(anchor=tk.W, pady=(2, 0))
+        self._update_fps_label()
+        
+        # 顯示選項設定
+        display_frame = ttk.LabelFrame(self.parent_frame, text="總覽顯示選項", padding=5)
+        display_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        ttk.Checkbutton(
+            display_frame,
+            text="顯示當前狀態",
+            variable=self.show_status_var,
+            command=self.update_status_visibility
+        ).pack(anchor=tk.W, pady=1)
+        
+        ttk.Checkbutton(
+            display_frame,
+            text="顯示追蹤計算器",
+            variable=self.show_tracker_var,
+            command=self.update_tracker_visibility
+        ).pack(anchor=tk.W, pady=1)
+        
+        
+        
         
         # 分頁顯示設定
         tabs_frame = ttk.LabelFrame(self.parent_frame, text="分頁顯示設定", padding=5)
