@@ -619,9 +619,10 @@ pip install -r requirements.txt
 
 ---
 
-## 📄 授權聲明
+## 📄 授權聲明 LICENCE
 
-本程序僅供個人學習和研究使用，請遵守遊戲條款和相關法律法規。
+本專案採用 MIT 授權條款 - 詳細內容請參閱 [LICENSE](LICENSE) 檔案。
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
