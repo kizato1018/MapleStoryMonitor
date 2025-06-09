@@ -36,6 +36,21 @@ class GameMonitorMainWindow:
         self.root.title("遊戲狀態監控")
         self.root.geometry("380x580")
         
+        # 設定視窗圖標
+        try:
+            import platform
+            if platform.system() == "Windows":
+                icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "icon.ico")
+            else:
+                icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "icon.png")
+            if os.path.exists(icon_path):
+                self.root.iconbitmap(icon_path)
+                logger.info(f"成功設定視窗圖標: {icon_path}")
+            else:
+                logger.warning(f"視窗圖標檔案不存在: {icon_path}")
+        except Exception as e:
+            logger.warning(f"設定視窗圖標失敗: {e}")
+        
         # 設定最小視窗大小
         self.root.minsize(380, 580)  # 最小寬度350，最小高度500以確保內容不被遮擋
         

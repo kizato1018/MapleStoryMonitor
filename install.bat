@@ -173,6 +173,7 @@ echo oLink.TargetPath = "%~dp0venv\Scripts\pythonw.exe"
 echo oLink.Arguments = "main.py"
 echo oLink.WorkingDirectory = "%~dp0"
 echo oLink.Description = "MapleStory Monitor"
+echo oLink.IconLocation = "%~dp0icon\icon.ico"
 echo oLink.Save
 ) > create_shortcut.vbs
 
