@@ -36,7 +36,7 @@ def get_remote_version():
 def download_update():
     """下載更新檔案"""
     try:
-        url = "https://github.com/kizato1018/MapleStoryMonitor/archive/refs/heads/main.zip"
+        url = "https://github.com/kizato1018/MapleStoryMonitor/archive/refs/heads/master.zip"
         temp_dir = tempfile.mkdtemp()
         zip_path = os.path.join(temp_dir, "update.zip")
         
