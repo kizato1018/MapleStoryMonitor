@@ -26,7 +26,7 @@ def get_local_version():
 def get_remote_version():
     """從GitHub獲取遠端版本號"""
     try:
-        url = "https://raw.githubusercontent.com/kizato1018/MapleStoryMonitor/main/version.txt"
+        url = "https://raw.githubusercontent.com/kizato1018/MapleStoryMonitor/master/version.txt"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         return response.text.strip()
@@ -198,14 +198,14 @@ def show_update_dialog(remote_ver):
         if platform.system() == "Windows":
             myappid = 'mycompany.myapp.subapp.1.0'  # 任意唯一值
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "icon.ico")
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "images", "icon.ico")
             if os.path.exists(icon_path):
                 root.iconbitmap(icon_path)
                 logger.debug(f"成功設定視窗圖標: {icon_path}")
             else:
                 logger.warning(f"視窗圖標檔案不存在: {icon_path}")
         else:
-            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "icon.png")
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "images", "icon.png")
             if os.path.exists(icon_path):
                 root.iconphoto(True, tk.Image("photo", file=icon_path)) # you may also want to try this.
                 logger.debug(f"成功設定視窗圖標: {icon_path}")
