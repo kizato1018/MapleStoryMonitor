@@ -41,13 +41,19 @@ class GameMonitorMainWindow:
             import platform
             if platform.system() == "Windows":
                 icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "icon.ico")
+                if os.path.exists(icon_path):
+                    self.root.iconbitmap(icon_path)
+                    logger.debug(f"成功設定視窗圖標: {icon_path}")
+                else:
+                    logger.warning(f"視窗圖標檔案不存在: {icon_path}")
             else:
                 icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "icon.png")
-            if os.path.exists(icon_path):
-                self.root.iconbitmap(icon_path)
-                logger.info(f"成功設定視窗圖標: {icon_path}")
-            else:
-                logger.warning(f"視窗圖標檔案不存在: {icon_path}")
+                if os.path.exists(icon_path):
+                    self.root.iconphoto(True, tk.Image("photo", file=icon_path)) # you may also want to try this.
+                    logger.debug(f"成功設定視窗圖標: {icon_path}")
+                else:
+                    logger.warning(f"視窗圖標檔案不存在: {icon_path}")
+            
         except Exception as e:
             logger.warning(f"設定視窗圖標失敗: {e}")
         
