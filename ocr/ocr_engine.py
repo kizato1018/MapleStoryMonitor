@@ -141,7 +141,7 @@ class OCREngine:
             saturation = hsv[:, :, 1]
 
             # 設定彩度門檻（例如 100）
-            threshold = 80
+            threshold = 85
 
             # 建立遮罩：彩度超過門檻的位置
             mask1 = saturation > threshold
@@ -165,20 +165,24 @@ class OCREngine:
 
             # 對四個邊緣進行 floodFill，尋找相連的黑色 (0)
             threshold = 255
+            to = 0
             for x in range(w):
-                if floodfilled[0, x] >= threshold:
-                    cv2.floodFill(floodfilled, mask, (x, 0), 0)
-                if floodfilled[h - 1, x] >= threshold:
-                    cv2.floodFill(floodfilled, mask, (x, h - 1), 0)
+                if floodfilled[0, x] == threshold:
+                    cv2.floodFill(floodfilled, mask, (x, 0), to)
+                if floodfilled[h - 1, x] == threshold:
+                    cv2.floodFill(floodfilled, mask, (x, h - 1), to)
             for y in range(h):
-                if floodfilled[y, 0] >= threshold:
-                    cv2.floodFill(floodfilled, mask, (0, y), 0)
-                if floodfilled[y, w - 1] >= threshold:
-                    cv2.floodFill(floodfilled, mask, (w - 1, y), 0)
+                if floodfilled[y, 0] == threshold:
+                    cv2.floodFill(floodfilled, mask, (0, y), to)
+                if floodfilled[y, w - 1] == threshold:
+                    cv2.floodFill(floodfilled, mask, (w - 1, y), to)
 
             # floodfilled 中原本與邊界連通的黑色已變為白色 (255)
             # 其餘區域保留原樣
             output = floodfilled
+            # output = cv2.bitwise_not(output)
+            output = cv2.morphologyEx(output, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8), iterations=1)
+
             
         except Exception as e:
             logger.debug(f"圖像預處理錯誤: {e}")
@@ -243,8 +247,9 @@ class OCREngine:
                 image,
                 allowlist=self.allow_list,
                 paragraph=False,
-                text_threshold=0.5,
-                min_size=5, width_ths=0.5,height_ths=0.3,
+                text_threshold=0.6,
+                link_threshold=0.5,
+                low_text=0.5,
                 detail=1
             )
             bbox, text, confidence = self._potions_postprocess_result(result)
