@@ -478,7 +478,6 @@ class RegionSelectionWidget:
                     logger.warning(f"無法獲取顯示縮放因子: {e}")
                     # 嘗試另一種方法
                     try:
-                        import subprocess
                         result = subprocess.run(['system_profiler', 'SPDisplaysDataType'], 
                                             capture_output=True, text=True)
                         if 'Retina' in result.stdout:
