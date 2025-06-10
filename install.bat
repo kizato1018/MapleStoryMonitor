@@ -1,170 +1,171 @@
 @echo off
 setlocal EnableDelayedExpansion
 echo ================================================
-echo   MapleStory Monitor 自動安裝腳本 (Windows)
+echo   MapleStory Monitor Auto Install Script (Windows)
 echo ================================================
 echo.
 
-@REM :: 檢查管理員權限
+@REM :: Check administrator privileges
 @REM net session >nul 2>&1
 @REM if errorlevel 1 (
-@REM     echo [警告] 建議以系統管理員身分執行此腳本
-@REM     echo 如遇權限問題，請右鍵點擊此檔案並選擇以「以系統管理員身分執行」
+@REM     echo [Warning] Recommend running this script as administrator
+@REM     echo If you encounter permission issues, right-click this file and select "Run as administrator"
 @REM     echo.
-@REM     echo 按任意鍵繼續，或按 Ctrl+C 取消...
+@REM     echo Press any key to continue, or press Ctrl+C to cancel...
 @REM     pause >nul
 @REM )
 
-:: 檢查 Python 是否已安裝
+:: Check if Python is installed
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo [錯誤] 未找到 Python，請先安裝 Python 3.8 或更新版本
-    echo 下載網址: https://www.python.org/downloads/
-    echo 安裝時請務必勾選 "Add Python to PATH"
+    echo [Error] Python not found, please install Python 3.8 or newer version
+    echo Download URL: https://www.python.org/downloads/
+    echo Make sure to check "Add Python to PATH" during installation
     pause
     exit /b 1
 )
 
-echo [1/8] 檢查 Python 版本...
+echo [1/8] Checking Python version...
 for /f "tokens=2" %%i in ('python --version') do set PYTHON_VERSION=%%i
-echo 已找到 Python %PYTHON_VERSION%
+echo Found Python %PYTHON_VERSION%
 
-:: 檢查 pip
-echo [2/8] 檢查 pip...
+:: Check pip
+echo [2/8] Checking pip...
 python -m pip --version >nul 2>&1
 if errorlevel 1 (
-    echo [錯誤] pip 未正確安裝
+    echo [Error] pip is not properly installed
     pause
     exit /b 1
 )
-echo pip 檢查完成
+echo pip check completed
 
-:: 清理舊的虛擬環境
-echo [3/8] 清理舊環境...
+:: Clean old virtual environment
+echo [3/8] Cleaning old environment...
 if exist "venv" (
     echo.
-    echo 偵測到舊的虛擬環境！
+    echo Old virtual environment detected!
     echo.
-    echo 選擇操作：
-    echo   1. 重新安裝 - 刪除舊環境並重新建立 ^(建議^)
-    echo   2. 保留現有環境 - 跳過虛擬環境建立
-    echo   3. 取消安裝
+    echo Choose action:
+    echo   1. Reinstall - Delete old environment and create new one ^(Recommended^)
+    echo   2. Keep existing environment - Skip virtual environment creation
+    echo   3. Cancel installation
     echo.
-    set /p choice="請輸入選擇 (1/2/3): "
+    set "choice=1"
+    set /p choice="Please enter your choice (1/2/3): "
     
     if "!choice!"=="1" (
         echo.
-        echo 正在刪除舊的虛擬環境...
+        echo Deleting old virtual environment...
         
-        :: 嘗試正常刪除
+        :: Try normal deletion
         rmdir /s /q venv >nul 2>&1
         
-        :: 如果刪除失敗，嘗試強制刪除
+        :: If deletion fails, try force deletion
         if exist "venv" (
-            echo 正在強制清理舊環境...
+            echo Force cleaning old environment...
             timeout /t 2 /nobreak >nul
             
-            :: 移除只讀屬性
+            :: Remove read-only attributes
             attrib -R venv\*.* /S /D >nul 2>&1
             
-            :: 再次嘗試刪除
+            :: Try deleting again
             rmdir /s /q venv >nul 2>&1
             
-            :: 如果還是存在，提示用戶
+            :: If still exists, prompt user
             if exist "venv" (
-                echo [警告] 無法完全清理舊環境，可能有檔案被鎖定
-                echo 請關閉所有相關程序後重新執行安裝腳本
-                echo 或手動刪除 venv 資料夾
+                echo [Warning] Cannot completely clean old environment, some files may be locked
+                echo Please close all related programs and run the install script again
+                echo Or manually delete the venv folder
                 pause
                 exit /b 1
             )
         )
-        echo 舊環境清理完成
+        echo Old environment cleanup completed
     ) else if "!choice!"=="2" (
         echo.
-        echo 保留現有虛擬環境，跳到依賴套件安裝...
+        echo Keeping existing virtual environment, jumping to package installation...
         goto install_packages
     ) else if "!choice!"=="3" (
         echo.
-        echo 安裝已取消
+        echo Installation cancelled
         pause
         exit /b 0
     ) else (
         echo.
-        echo 無效的選擇，預設進行重新安裝...
+        echo Invalid choice, defaulting to reinstall...
         goto :reinstall_env
     )
 ) else (
-    echo 未發現舊環境
+    echo No old environment found
 )
 
-:: 創建虛擬環境
-echo [4/8] 創建虛擬環境...
+:: Create virtual environment
+echo [4/8] Creating virtual environment...
 :reinstall_env
 python -m venv venv
 if errorlevel 1 (
-    echo [錯誤] 創建虛擬環境失敗
-    echo 可能的解決方案：
-    echo 1. 確保有足夠的磁碟空間
-    echo 2. 檢查防毒軟體是否阻擋
-    echo 3. 以系統管理員身分執行
+    echo [Error] Failed to create virtual environment
+    echo Possible solutions:
+    echo 1. Ensure sufficient disk space
+    echo 2. Check if antivirus software is blocking
+    echo 3. Run as administrator
     pause
     exit /b 1
 )
 
-:: 等待檔案系統同步
+:: Wait for file system sync
 timeout /t 2 /nobreak >nul
-echo 虛擬環境創建成功
+echo Virtual environment created successfully
 
-:: 檢查虛擬環境是否正常
-echo [5/8] 檢查虛擬環境...
+:: Check if virtual environment is normal
+echo [5/8] Checking virtual environment...
 if not exist "venv\Scripts\python.exe" (
-    echo [錯誤] 虛擬環境建立不完整
-    echo 請檢查防毒軟體設定或嘗試以管理員權限執行
+    echo [Error] Virtual environment creation incomplete
+    echo Please check antivirus settings or try running with administrator privileges
     pause
     exit /b 1
 )
 
-:: 啟動虛擬環境並升級 pip
-echo [6/8] 啟動虛擬環境並升級 pip...
+:: Activate virtual environment and upgrade pip
+echo [6/8] Activating virtual environment and upgrading pip...
 call venv\Scripts\activate.bat
 if errorlevel 1 (
-    echo [錯誤] 無法啟動虛擬環境
-    echo 嘗試直接使用虛擬環境中的 Python...
+    echo [Error] Cannot activate virtual environment
+    echo Trying to use Python directly from virtual environment...
     venv\Scripts\python.exe -m pip install --upgrade pip
 ) else (
     python -m pip install --upgrade pip
 )
 
-:: 安裝依賴套件
+:: Install dependencies
 :install_packages
-echo [7/8] 安裝依賴套件...
-echo 這可能需要幾分鐘時間，請耐心等待...
+echo [7/8] Installing dependencies...
+echo This may take a few minutes, please be patient...
 
-:: 確保在正確的目錄
+:: Ensure in correct directory
 cd /d "%~dp0"
 
-:: 嘗試使用激活的環境安裝
+:: Try installing using activated environment
 python -m pip install -r requirements.txt
 if errorlevel 1 (
-    echo [警告] 使用激活環境安裝失敗，嘗試直接使用虛擬環境...
+    echo [Warning] Installation failed with activated environment, trying direct virtual environment...
     venv\Scripts\python.exe -m pip install -r requirements.txt
     if errorlevel 1 (
-        echo [錯誤] 安裝依賴套件失敗
-        echo 可能的解決方案：
-        echo 1. 檢查網路連線
-        echo 2. 檢查防火牆設定
-        echo 3. 嘗試使用手機熱點
-        echo 4. 手動安裝：venv\Scripts\python.exe -m pip install -r requirements.txt
+        echo [Error] Failed to install dependencies
+        echo Possible solutions:
+        echo 1. Check network connection
+        echo 2. Check firewall settings
+        echo 3. Try using mobile hotspot
+        echo 4. Manual installation: venv\Scripts\python.exe -m pip install -r requirements.txt
         pause
         exit /b 1
     )
 )
 
-:: 創建啟動腳本
-echo [8/8] 創建啟動腳本...
+:: Create launch script
+echo [8/8] Creating launch script...
 
-:: 創建 VBS 腳本來生成捷徑
+:: Create VBS script to generate shortcut
 (
 echo Set oWS = WScript.CreateObject^("WScript.Shell"^)
 echo sLinkFile = "%~dp0run.lnk"
@@ -177,23 +178,23 @@ echo oLink.IconLocation = "%~dp0icon\icon.ico"
 echo oLink.Save
 ) > create_shortcut.vbs
 
-:: 執行 VBS 腳本創建捷徑
+:: Execute VBS script to create shortcut
 cscript //nologo create_shortcut.vbs
 
-:: 刪除臨時 VBS 檔案
+:: Delete temporary VBS file
 del create_shortcut.vbs
 
-:: 重命名捷徑為 run.lnk（實際上是 .lnk 檔案，但顯示為 run）
+:: Rename shortcut to run.lnk (actually .lnk file, but displays as run)
 if exist "run.lnk" (
-    echo 捷徑創建成功
+    echo Shortcut created successfully
 ) else (
-    echo [警告] 捷徑創建失敗，創建備用批次檔...
-    :: 如果捷徑創建失敗，創建備用的批次檔
+    echo [Warning] Shortcut creation failed, creating backup batch file...
+    :: If shortcut creation fails, create backup batch file
     (
     echo @echo off
     echo cd /d "%~dp0"
     echo if not exist "venv\Scripts\pythonw.exe" ^(
-    echo     echo [錯誤] 虛擬環境不存在，請重新執行 install.bat
+    echo     echo [Error] Virtual environment does not exist, please run install.bat again
     echo     pause
     echo     exit /b 1
     echo ^)
@@ -205,27 +206,27 @@ if exist "run.lnk" (
 
 echo.
 echo ================================================
-echo           ? 安裝完成！ ?
+echo           Installation Complete!
 echo ================================================
 echo.
-echo 使用方法：
+echo Usage:
 if exist "run.lnk" (
-    echo   ? 雙擊 run 捷徑啟動程序
+    echo   Double-click the run shortcut to start the program
 ) else (
-    echo   ? 雙擊 run.bat 啟動程序
+    echo   Double-click run.bat to start the program
 )
 echo.
-echo 注意事項：
-echo   ? 請確保 MapleStory 遊戲已啟動
-echo   ? 首次使用需要設定視窗選擇和監控區域
-echo   ? 如遇問題請使用 run_debug.bat 查看錯誤訊息
-echo   ? 詳細記錄檔位於 Log 資料夾中
+echo Notes:
+echo   Make sure MapleStory game is running
+echo   First use requires window selection and monitoring area setup
+echo   If you encounter problems, use run_debug.bat to view error messages
+echo   Detailed logs are located in the Log folder
 echo.
-echo 疑難排解：
-echo   ? 如果啟動失敗，請檢查防毒軟體設定
-echo   ? 確保 venv 資料夾沒有被防毒軟體隔離
-echo   ? 可嘗試將程序資料夾加入防毒軟體白名單
-echo   ? 使用 run_debug.bat 可以看到詳細的錯誤訊息
+echo Troubleshooting:
+echo   If startup fails, check antivirus software settings
+echo   Ensure the venv folder is not quarantined by antivirus
+echo   Try adding the program folder to antivirus whitelist
+echo   Use run_debug.bat to see detailed error messages
 echo.
-echo 按任意鍵退出...
+echo Press any key to exit...
 pause >nul
