@@ -285,12 +285,13 @@ class RegionSelectionWidget:
                 outline="red", width=2, fill="red", stipple="gray50"
             )
             
+            title_bar_offset = 30 if self.is_macos else 0
 
             # 將畫布座標轉換為實際螢幕像素座標
             screen_start_x = self.start_x * self.scale_factor
-            screen_start_y = self.start_y * self.scale_factor
+            screen_start_y = (self.start_y + title_bar_offset) * self.scale_factor
             screen_event_x = event.x * self.scale_factor
-            screen_event_y = event.y * self.scale_factor
+            screen_event_y = (event.y + title_bar_offset) * self.scale_factor
 
             
             # 計算相對於目標視窗的座標
@@ -302,6 +303,8 @@ class RegionSelectionWidget:
                 rel_y1 = min(screen_start_y, screen_event_y) - window_top
                 rel_x2 = max(screen_start_x, screen_event_x) - window_left
                 rel_y2 = max(screen_start_y, screen_event_y) - window_top
+
+
                 
                 # 驗證並修正座標
                 window_width = window_right - window_left
@@ -361,6 +364,10 @@ class RegionSelectionWidget:
                     x1, y1, x2, y2 = coords
                     
                     # 轉換為螢幕座標（考慮縮放因子）
+
+                    title_bar_offset = 30 if self.is_macos else 0
+                    y1 += title_bar_offset
+                    y2 += title_bar_offset
 
                     screen_x1 = min(x1, x2) * self.scale_factor
                     screen_y1 = min(y1, y2) * self.scale_factor
