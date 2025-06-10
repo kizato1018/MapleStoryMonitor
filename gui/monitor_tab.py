@@ -128,7 +128,7 @@ class GameMonitorTab:
                         self.latest_image = captured_img
                         
                         # [Deubg] 儲存到tmp/{tab_name}.png
-                        Image.Image.save(self.latest_image, f"tmp/{self.tab_name}.png")
+                        # Image.Image.save(self.latest_image, f"tmp/{self.tab_name}.png")
                         
                         # 在主線程中更新預覽
                         self.parent.after(0, self._update_preview)
