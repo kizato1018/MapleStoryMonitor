@@ -11,7 +11,8 @@ class PotionManager:
     
     def __init__(self):
         self.potion = None
-        self.last_valid_potion = None  # 記錄最後一次有效的藥水值
+        self.last_valid_value = None  # 記錄最後一次有效的藥水值
+        self.value = None
         self.potion_history = deque(maxlen=600)  # 10分鐘，每秒一筆
         self.timer = MonitorTimer()  # 使用MonitorTimer管理時間
         self.start_potion_value = None  # int or None
@@ -75,12 +76,12 @@ class PotionManager:
     def update(self, potion_value: str):
         """更新藥水數量"""
         # 檢查新的藥水值是否有效
-        value = self._parse_potion_value(potion_value)
+        self.value = self._parse_potion_value(potion_value)
         
         # 如果新值有效，更新藥水值和最後有效值
-        if value is not None:
+        if self.value is not None:
             self.potion = potion_value
-            self.last_valid_potion = potion_value
+            self.last_valid_value = self.value
         else:
             # 如果新值無效，保持原有的 potion 值但使用最後有效值進行計算
             self.potion = potion_value  # 保存原始值用於顯示
@@ -90,7 +91,7 @@ class PotionManager:
             current_effective_time = self._get_current_effective_time()
             
             # 使用最後有效的藥水值進行計算
-            calc_value = self._get_valid_potion_value()
+            calc_value = self.last_valid_value
             
             if calc_value is not None:
                 # 檢測補充邏輯：從0變成其他數字 = 補充3000個
@@ -131,9 +132,9 @@ class PotionManager:
 
     def _get_valid_potion_value(self) -> Optional[int]:
         """獲取有效的藥水值（優先使用最後有效值）"""
-        if self.last_valid_potion:
-            return self._parse_potion_value(self.last_valid_potion)
-        return self._parse_potion_value(self.potion) if self.potion else None
+        if self.last_valid_value:
+            return self.last_valid_value
+        return self.value if self.value else None
 
     def _parse_potion_value(self, value: str) -> Optional[int]:
         """
@@ -280,7 +281,7 @@ class PotionManager:
         cost_per_10min, total_cost = self.get_cost_per_10min()
         cost_10min_data, total_cost_data = self.get_cost_per_10min_data()
         elapsed_time = self.get_elapsed_time()
-        cur_value = self._get_valid_potion_value()
+        # cur_value = self._get_valid_potion_value()
         timer_status = self.timer.get_status()
         
         return {
@@ -297,7 +298,7 @@ class PotionManager:
             "cost_10min_data": cost_10min_data,
             "total_cost_data": total_cost_data,
             "unit_cost": self.unit_cost,
-            "current_potion_value": cur_value,
+            "current_potion_value": self.value,
             "total_used_amount": self.total_used,
             "timer_status": timer_status
         }

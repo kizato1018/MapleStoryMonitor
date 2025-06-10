@@ -80,32 +80,43 @@ class OCREngine:
 
         try:
             # 過濾有效圖像
-            valid_images = {name: img for name, img in images_dict.items() if img is not None}
-            if not valid_images:
+            potion_images = {}
+            status_images = {}
+            for name, img in images_dict.items():
+                if isinstance(img, Image.Image):
+                    if '藥水' in name:
+                        potion_images[name] = img
+                    else:
+                        status_images[name] = img
+            if not status_images and not potion_images:
                 return
             
-            # 進行前處理
-            for tab_name, image in valid_images.items():
-                if '藥水' in tab_name:
-                    processed_image = self._potions_preprocess_image(image)
-                    valid_images[tab_name] = processed_image
+            # 處理藥水圖像
+            for tab_name, image in potion_images.items():
+                Image.Image.save(image, f"tmp/{tab_name}.png")  # 保存圖像以便調試
+                new_image = Image.open(f"tmp/{tab_name}.png")
+                result = self._process_potion_image(new_image, tab_name)
+                if self.result_callback:
+                    self.result_callback(tab_name, result)
             
-            if len(valid_images) == 1:
+
+
+            if len(status_images) == 1:
                 # 單個圖像直接處理
-                tab_name, image = next(iter(valid_images.items()))
+                tab_name, image = next(iter(status_images.items()))
                 result = self._process_single_image(image)
                 if self.result_callback:
                     self.result_callback(tab_name, result)
             else:
                 # 多個圖像合併處理
-                merged_image, tab_positions = self._merge_images(valid_images)
+                merged_image, tab_positions = self._merge_images(status_images)
                 merged_results = self._process_merged_image(merged_image, tab_positions)
                 
                 # 分配結果給各個標籤
                 for tab_name, result in merged_results.items():
                     # 如果結果為"無法識別"，則嘗試單獨處理該圖像
                     if result == "無法識別":
-                        result = self._process_single_image(valid_images[tab_name])
+                        result = self._process_single_image(status_images[tab_name])
                     
                     if self.result_callback:
                         self.result_callback(tab_name, result)
@@ -120,18 +131,17 @@ class OCREngine:
     def _potions_preprocess_image(self, image):
         try:
             img = np.array(image)
-            
-            img = cv2.resize(img, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+            scale = min(80 / img.shape[0], 1)
+            img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
             # 轉換為 HSV 色彩空間
             hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-            
 
             # 取得 S（彩度）通道
             saturation = hsv[:, :, 1]
 
             # 設定彩度門檻（例如 100）
-            threshold = 90
+            threshold = 80
 
             # 建立遮罩：彩度超過門檻的位置
             mask1 = saturation > threshold
@@ -140,80 +150,6 @@ class OCREngine:
             output = img.copy()
             output[mask1] = [0, 0, 0]
             
-            #轉換為灰階
-            output = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
-            clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(8,8))
-            output = clahe.apply(output)
-            
-            blur = cv2.GaussianBlur(output, (3,3), 0)
-            sharp = cv2.addWeighted(output, 1.5, blur, -0.5, 0)
-            # 5. 自適應二值化
-            output = cv2.adaptiveThreshold(
-                sharp, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                cv2.THRESH_BINARY_INV, 15, 10
-            )
-            
-            kernel = np.ones((2,2), np.uint8)
-            output = cv2.morphologyEx(output, cv2.MORPH_CLOSE, kernel, iterations=1)
-            
-            # 建立遮罩（需比原圖大2）
-            h, w = output.shape
-            mask = np.zeros((h + 2, w + 2), np.uint8)
-
-            # 複製原圖作為填色目標
-            floodfilled = output.copy()
-
-            # 對四個邊緣進行 floodFill，尋找相連的黑色 (0)
-            for x in range(w):
-                if floodfilled[0, x] == 0:
-                    cv2.floodFill(floodfilled, mask, (x, 0), 255)
-                if floodfilled[h - 1, x] == 0:
-                    cv2.floodFill(floodfilled, mask, (x, h - 1), 255)
-            for y in range(h):
-                if floodfilled[y, 0] == 0:
-                    cv2.floodFill(floodfilled, mask, (0, y), 255)
-                if floodfilled[y, w - 1] == 0:
-                    cv2.floodFill(floodfilled, mask, (w - 1, y), 255)
-
-            # floodfilled 中原本與邊界連通的黑色已變為白色 (255)
-            # 其餘區域保留原樣
-            output = floodfilled
-            
-            output = cv2.morphologyEx(output, cv2.MORPH_DILATE, kernel, iterations=1)
-
-            output = cv2.bitwise_not(output)  # 反轉：黑色區塊變白色，白色區塊變黑色
-            # # 對前景做 connected component analysis
-            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(output, connectivity=8)
-            
-            max_threshold = 170  # 設定最大面積門檻
-            #  把「大區塊」設為背景（即圖中變白色）
-            for i in range(1, num_labels):  # 跳過 index 0：背景
-                area = stats[i, cv2.CC_STAT_AREA]
-                if area > max_threshold:
-                    output[labels == i] = 0  # 設為黑背景（因為 binary 是反轉過的）
-
-
-            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(output, connectivity=8)
-            
-            # 設定面積門檻，過濾大型黑色區塊
-            sorted_areas = np.sort(stats[1:, cv2.CC_STAT_AREA], axis=0)[::-1]
-            # print(f"Sorted areas: {sorted_areas}")
-            drops = np.abs(np.diff(sorted_areas))
-            # print(f"Drops: {drops}")
-            # 找到前5個中最大落差的index
-            max_drop_index = np.argmax(drops[:4]) if len(drops) >= 4 else np.argmax(drops)
-            # print(f"Max drop index: {max_drop_index}")
-            area_threshold = min(sorted_areas[max_drop_index], 50)
-            
-
-
-            #  把「大區塊」設為背景（即圖中變白色）
-            for i in range(1, num_labels):  # 跳過 index 0：背景
-                area = stats[i, cv2.CC_STAT_AREA]
-                if area < area_threshold:
-                    output[labels == i] = 0  # 設為黑背景（因為 binary 是反轉過的）
-                    
-            output = Image.fromarray(output)
             
         except Exception as e:
             logger.debug(f"圖像預處理錯誤: {e}")
@@ -221,6 +157,77 @@ class OCREngine:
 
         return output
 
+    def _potions_postprocess_result(self, result: str) -> str:
+        """
+        處理藥水OCR結果的後處理
+        
+        Args:
+            result: OCR識別結果
+        
+        Returns:
+            str: 處理後的結果
+        """
+        if not result:
+            return (None, "無法識別1", 0.0)
+        
+        # 找到最左下角的結果
+        # 結果格式: (bbox, text, confidence)
+        # bbox格式: [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+        
+        best_result = None
+        max_y = -1
+        min_x = float('inf')
+        
+        for bbox, text, confidence in result:
+            # 計算左下角的座標 (最小x值和最大y值)
+            x_coords = [point[0] for point in bbox]
+            y_coords = [point[1] for point in bbox]
+            
+            left_x = min(x_coords)
+            bottom_y = max(y_coords)
+            
+            # 優先選擇最下方的，如果y座標相同則選擇最左邊的
+            if bottom_y > max_y or (bottom_y == max_y and left_x < min_x):
+                max_y = bottom_y
+                min_x = left_x
+                best_result = (bbox, text, confidence)
+        
+        return best_result if best_result else (None, "無法識別2", 0.0)
+
+    def _process_potion_image(self, image: Image.Image, name) -> str:
+        """
+        處理藥水圖像的OCR
+        
+        Args:
+            image: 要處理的圖像
+        
+        Returns:
+            str: OCR識別結果
+        """
+        try:
+            if not self.ocr_reader:
+                return "OCR未初始化"
+            # 將PIL圖像轉換為numpy數組
+            image = self._potions_preprocess_image(image)
+            Image.fromarray(image).save(f"tmp/{name}_2.png")  # 保存圖像以便調試
+            result = self.ocr_reader.readtext(
+                image,
+                allowlist=self.allow_list,
+                paragraph=False,
+                text_threshold=0.5,
+                min_size=5, width_ths=0.5,height_ths=0.3,
+                detail=1
+            )
+            bbox, text, confidence = self._potions_postprocess_result(result)
+            print(f"[OCR DEBUG] 藥水OCR結果: {text}, 信心度: {confidence}")  # <--- debug
+
+            return text
+
+        except Exception as e:
+            logger.debug(f"藥水圖像OCR處理錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+            return "OCR錯誤"
     
     def _process_single_image(self, image: Image.Image) -> str:
         """

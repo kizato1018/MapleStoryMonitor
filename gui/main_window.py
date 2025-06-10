@@ -545,13 +545,15 @@ class GameMonitorMainWindow:
             # 更新楓幣管理器
             self.coin_manager.update(result)
                 
+            coin = self.coin_manager.get_status()['current_coin_value']
+            coin_text = f"{coin:,}" if coin is not None else "N/A"
             # 更新對應標籤頁的結果
             if tab_name in self.tabs:
-                self.tabs[tab_name].set_ocr_result(result)
+                self.tabs[tab_name].set_ocr_result(coin_text)
             
             # 更新總覽頁面
             if tab_name in self.overview_labels:
-                self.overview_labels[tab_name].config(text=result)
+                self.overview_labels[tab_name].config(text=coin_text)
                 
         elif "藥水" in tab_name:
             # 更新藥水管理器

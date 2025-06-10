@@ -15,8 +15,8 @@ if sys.platform == "darwin":
             CGRectMake, CGRectNull, kCGWindowListOptionOnScreenOnly,
             kCGWindowListExcludeDesktopElements, kCGWindowImageDefault,
             kCGNullWindowID, CGDataProviderCopyData, CGImageGetDataProvider,
-            CGImageGetWidth, CGImageGetHeight, CGImageGetBitsPerComponent,
-            kCGWindowImageBoundsIgnoreFraming, CGImageGetBytesPerRow, kCGWindowListOptionIncludingWindow
+            CGImageGetWidth, CGImageGetHeight, kCGWindowImageBoundsIgnoreFraming,
+            CGImageGetBytesPerRow, kCGWindowListOptionIncludingWindow
         )
         PYOBJC_AVAILABLE = True
     except ImportError as e:
@@ -118,8 +118,9 @@ class MacCaptureEngine(BaseCaptureEngine):
                     logger.warning("CGImage 轉 PIL 失敗")
                     return None
                 return pil_img
-            else:
-                # ...原本的螢幕區域擷取...
+            # else:
+                # # ...原本的螢幕區域擷取...
+                # print("沒有指定視窗ID，使用螢幕區域擷取")
                 # image_ref = CGWindowListCreateImage(
                 #     self.capture_rect,
                 #     kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements,
@@ -129,7 +130,6 @@ class MacCaptureEngine(BaseCaptureEngine):
                 # if not image_ref:
                 #     return None
                 # return self._cgimage_to_pil(image_ref)
-                raise ValueError("未指定視窗ID，無法進行擷取")
         except Exception as e:
             logger.error(f"Mac區域捕捉錯誤: {e}")
             import traceback
@@ -267,19 +267,28 @@ class MacCaptureEngine(BaseCaptureEngine):
             logger.error(f"獲取視窗矩形錯誤: {e}")
             return None
     
-    def get_display_scale_factor(self) -> float:
+    @staticmethod
+    def get_display_scale_factor() -> float:
+        """獲取顯示縮放因子（靜態方法，可被外部調用）"""
         if not PYOBJC_AVAILABLE:
             return 1.0
+
         try:
-            # 使用NSWorkspace獲取主顯示器的縮放因子
-            main_display = NSWorkspace.sharedWorkspace().mainScreen()
-            if main_display:
-                scale_factor = main_display.backingScaleFactor()
-                logger.debug(f"主顯示器縮放因子: {scale_factor}")
-                return scale_factor
-            else:
-                logger.warning("無法獲取主顯示器")
-                return 1.0
-        except Exception as e:
-            logger.error(f"獲取顯示縮放因子錯誤: {e}")
+            from Cocoa import NSScreen
+            main_screen = NSScreen.mainScreen()
+            if main_screen:
+                backing_scale_factor = main_screen.backingScaleFactor()
+                return float(backing_scale_factor)
             return 1.0
+        except Exception as e:
+            logger.warning(f"無法獲取顯示縮放因子: {e}")
+            # 嘗試另一種方法
+            try:
+                import subprocess
+                result = subprocess.run(['system_profiler', 'SPDisplaysDataType'], 
+                                      capture_output=True, text=True)
+                if 'Retina' in result.stdout:
+                    return 2.0  # 大多數 Retina 顯示器
+                return 1.0
+            except:
+                return 2.0  # 預設為 2.0，因為大多數現代 Mac 都是 Retina
