@@ -21,8 +21,7 @@ logger = get_logger(__name__)
 
 class GameMonitorTab:
     """單個監控標籤頁類別"""
-    def __init__(self, parent, tab_name: str, config_callback: Optional[Callable] = None, 
-                 shared_frequency_var: Optional[tk.StringVar] = None, 
+    def __init__(self, parent, tab_name: str, config_callback: Optional[Callable] = None,  
                  capture_engine: BaseCaptureEngine = None,
                  get_window_info_callback: Optional[Callable] = None):
         self.parent = parent
@@ -33,11 +32,10 @@ class GameMonitorTab:
         self.ocr_allow_list = '0123456789.[]/%'
         self.is_capturing = False
         self.capture_thread = None
-        self.shared_frequency_var = shared_frequency_var
         self.get_window_info_callback = get_window_info_callback
         
         # 捕捉引擎 - 使用外部傳入的實例
-        self.capture_engine = capture_engine
+        self.capture_manager = capture_engine
         
         self._create_tab()
         
@@ -109,7 +107,7 @@ class GameMonitorTab:
     def stop_capture(self):
         """停止擷取"""
         self.is_capturing = False
-        self.capture_engine.cleanup_resources()
+        self.capture_manager.cleanup_resources()
     
     def _capture_loop(self):
         """擷取迴圈"""
@@ -119,7 +117,7 @@ class GameMonitorTab:
                 
                 if region:
                     # 擷取圖像
-                    captured_img = self.capture_engine.get_region(
+                    captured_img = self.capture_manager.get_region(
                         x=region['x'], 
                         y=region['y'], 
                         w=region['w'], 
@@ -142,10 +140,10 @@ class GameMonitorTab:
 
             except Exception as e:
                 logger.error(f"{self.tab_name} 擷取錯誤: {e}")
-            time.sleep(1 /  float(self.shared_frequency_var.get()) if self.shared_frequency_var else 1)
+            time.sleep(1 /  float(self.capture_manager.capture_fps) if self.capture_manager.capture_fps else 0.1)
         
         # 清理資源
-        self.capture_engine.cleanup_resources()
+        self.capture_manager.cleanup_resources()
     
     def _update_preview(self):
         """更新預覽"""

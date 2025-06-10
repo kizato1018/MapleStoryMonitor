@@ -252,10 +252,10 @@ class GameMonitorMainWindow:
                 
                 self.overview_labels[stat_name] = value_label
 
-    def _update_fps_label(self, *args):
+    def _update_fps(self, *args):
         """更新全域FPS標籤"""
         if self.settings_tab:
-            self.settings_tab._update_fps_label(*args)
+            self.settings_tab._update_fps(*args)
 
     def _update_status_visibility(self):
         """更新狀態顯示的可見性"""
@@ -401,7 +401,6 @@ class GameMonitorMainWindow:
             self.notebook, 
             tab_name, 
             None,  # 暫時不綁定config_callback
-            self.fps_var, 
             self.capture_manager,  # 傳遞共享捕捉管理器
             self.settings_widget.get_window_info
         )
@@ -624,7 +623,7 @@ class GameMonitorMainWindow:
             fps = global_config.get('fps', self.config_manager.config_data.get('global_fps', 5.0))
             self.fps_var.set(str(fps))
             # 立即更新所有tab的frequency_controller
-            self._update_fps_label()
+            self._update_fps()
             self.auto_update_var.set(global_config.get('auto_update', True))
             
             # 載入顯示選項配置
@@ -677,7 +676,7 @@ class GameMonitorMainWindow:
         """綁定配置回調函數"""
         # 綁定FPS變數的回調
         self.fps_var.trace_add('write', lambda *args: self._save_config_if_ready())
-        self.fps_var.trace_add('write', self._update_fps_label)
+        self.fps_var.trace_add('write', self._update_fps)
         
         # 綁定顯示選項變數的回調
         self.show_status_var.trace_add('write', lambda *args: self._save_config_if_ready())

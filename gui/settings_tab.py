@@ -110,7 +110,7 @@ class SettingsTab:
         ttk.Entry(fps_control_frame, textvariable=self.fps_var, width=10).grid(row=0, column=1, padx=2)
         self.fps_label = ttk.Label(setting_frame, text="", font=('Arial', 8))
         self.fps_label.pack(anchor=tk.W, pady=(2, 0))
-        self._update_fps_label()
+        self._update_fps()
         
         # 顯示選項設定
         display_frame = ttk.LabelFrame(self.parent_frame, text="總覽顯示選項", padding=5)
@@ -182,17 +182,24 @@ class SettingsTab:
     
         return self.shared_window_widget
 
-    def _update_fps_label(self, *args):
+    def _update_fps(self, *args):
         """更新全域FPS標籤"""
         if not self.fps_label or not self.fps_var:
             return
-            
-        try:
+
+        try:  
             fps = float(self.fps_var.get())
-            interval = 1.0 / fps if fps > 0 else 0
-            self.fps_label.config(text=f"當前: {fps:.1f} FPS (間隔: {interval:.3f}秒)")
         except ValueError:
-            self.fps_label.config(text="請輸入有效的數值")
+            self.fps_var.set('0.1')
+            return 
+        if fps < 0.1:
+            self.fps_var.set('0.1')
+        elif fps > 30.0:
+            self.fps_var.set('30.0')
+        self.capture_manager.set_capture_fps(fps)
+        interval = 1.0 / fps if fps >= 0.1 else 0.1
+        self.fps_label.config(text=f"當前: {fps:.1f} FPS (間隔: {interval:.3f}秒)")
+
     
     def _update_transparency_label(self, *args):
         """更新透明度標籤"""
@@ -209,7 +216,7 @@ class SettingsTab:
     def bind_callbacks(self):
         """綁定回調函數"""
         if self.fps_var:
-            self.fps_var.trace_add('write', self._update_fps_label)
+            self.fps_var.trace_add('write', self._update_fps)
         if self.window_transparency_var:
             self.window_transparency_var.trace_add('write', self._update_transparency_label)
     

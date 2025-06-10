@@ -26,7 +26,7 @@ class BaseCaptureEngine(ABC):
         self.is_running = False
         self.capture_thread = None
         self.capture_lock = threading.Lock()
-        self.capture_frequency = 10.0  # FPS
+        self.capture_fps = 2.0  # FPS
         self._stop_event = threading.Event()
 
     def initialize(self, window_handle: Any) -> bool:
@@ -115,9 +115,9 @@ class BaseCaptureEngine(ABC):
             self.capture_thread.join(timeout=1.0)
         self.cleanup()
 
-    def update_capture_frequency(self, fps: float):
+    def set_capture_fps(self, fps: float):
         """更新捕捉頻率"""
-        self.capture_frequency = fps
+        self.capture_fps = fps
 
     def _capture_loop(self):
         """自動捕捉循環"""
@@ -138,7 +138,7 @@ class BaseCaptureEngine(ABC):
             except Exception as e:
                 logger.error(f"捕捉循環錯誤: {e}")
             finally:
-                interval = 1.0 / self.capture_frequency
+                interval = 1.0 / self.capture_fps
                 if not self._stop_event.wait(interval):
                     continue
                 else:
