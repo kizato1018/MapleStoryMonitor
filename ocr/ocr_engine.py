@@ -209,7 +209,7 @@ class OCREngine:
                 return "OCR未初始化"
             # 將PIL圖像轉換為numpy數組
             image = self._potions_preprocess_image(image)
-            Image.fromarray(image).save(f"tmp/{name}_2.png")  # 保存圖像以便調試
+            # Image.fromarray(image).save(f"tmp/{name}_2.png")  # 保存圖像以便調試
             result = self.ocr_reader.readtext(
                 image,
                 allowlist=self.allow_list,
