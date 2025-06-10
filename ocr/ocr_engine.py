@@ -131,7 +131,7 @@ class OCREngine:
     def _potions_preprocess_image(self, image):
         try:
             img = np.array(image)
-            scale = min(80 / img.shape[0], 1)
+            scale = max(min(80 / img.shape[0], 1), 3)
             img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
             # 轉換為 HSV 色彩空間
@@ -150,6 +150,35 @@ class OCREngine:
             output = img.copy()
             output[mask1] = [0, 0, 0]
             
+            
+            # 建立遮罩（需比原圖大2）
+            output = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+            
+            #進行手動2質化
+            _, output = cv2.threshold(output, 80, 255, cv2.THRESH_BINARY)
+                
+            h, w = output.shape
+            mask = np.zeros((h + 2, w + 2), np.uint8)
+
+            # 複製原圖作為填色目標
+            floodfilled = output.copy()
+
+            # 對四個邊緣進行 floodFill，尋找相連的黑色 (0)
+            threshold = 255
+            for x in range(w):
+                if floodfilled[0, x] >= threshold:
+                    cv2.floodFill(floodfilled, mask, (x, 0), 0)
+                if floodfilled[h - 1, x] >= threshold:
+                    cv2.floodFill(floodfilled, mask, (x, h - 1), 0)
+            for y in range(h):
+                if floodfilled[y, 0] >= threshold:
+                    cv2.floodFill(floodfilled, mask, (0, y), 0)
+                if floodfilled[y, w - 1] >= threshold:
+                    cv2.floodFill(floodfilled, mask, (w - 1, y), 0)
+
+            # floodfilled 中原本與邊界連通的黑色已變為白色 (255)
+            # 其餘區域保留原樣
+            output = floodfilled
             
         except Exception as e:
             logger.debug(f"圖像預處理錯誤: {e}")
