@@ -8,6 +8,8 @@ import threading
 import time
 from typing import Optional, Dict, List, Callable, Tuple
 from PIL import Image
+import numpy as np
+import cv2
 from utils.log import get_logger
 
 logger = get_logger(__name__)
@@ -82,6 +84,12 @@ class OCREngine:
             if not valid_images:
                 return
             
+            # 進行前處理
+            for tab_name, image in valid_images.items():
+                if '藥水' in tab_name:
+                    processed_image = self._potions_preprocess_image(image)
+                    valid_images[tab_name] = processed_image
+            
             if len(valid_images) == 1:
                 # 單個圖像直接處理
                 tab_name, image = next(iter(valid_images.items()))
@@ -107,6 +115,112 @@ class OCREngine:
             
         except Exception as e:
             logger.debug(f"批量OCR處理錯誤: {e}")
+            
+
+    def _potions_preprocess_image(self, image):
+        try:
+            img = np.array(image)
+            
+            img = cv2.resize(img, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+
+            # 轉換為 HSV 色彩空間
+            hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            
+
+            # 取得 S（彩度）通道
+            saturation = hsv[:, :, 1]
+
+            # 設定彩度門檻（例如 100）
+            threshold = 90
+
+            # 建立遮罩：彩度超過門檻的位置
+            mask1 = saturation > threshold
+
+            # 將彩度高的像素設為黑色 (0,0,0)
+            output = img.copy()
+            output[mask1] = [0, 0, 0]
+            
+            #轉換為灰階
+            output = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+            clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(8,8))
+            output = clahe.apply(output)
+            
+            blur = cv2.GaussianBlur(output, (3,3), 0)
+            sharp = cv2.addWeighted(output, 1.5, blur, -0.5, 0)
+            # 5. 自適應二值化
+            output = cv2.adaptiveThreshold(
+                sharp, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY_INV, 15, 10
+            )
+            
+            kernel = np.ones((2,2), np.uint8)
+            output = cv2.morphologyEx(output, cv2.MORPH_CLOSE, kernel, iterations=1)
+            
+            # 建立遮罩（需比原圖大2）
+            h, w = output.shape
+            mask = np.zeros((h + 2, w + 2), np.uint8)
+
+            # 複製原圖作為填色目標
+            floodfilled = output.copy()
+
+            # 對四個邊緣進行 floodFill，尋找相連的黑色 (0)
+            for x in range(w):
+                if floodfilled[0, x] == 0:
+                    cv2.floodFill(floodfilled, mask, (x, 0), 255)
+                if floodfilled[h - 1, x] == 0:
+                    cv2.floodFill(floodfilled, mask, (x, h - 1), 255)
+            for y in range(h):
+                if floodfilled[y, 0] == 0:
+                    cv2.floodFill(floodfilled, mask, (0, y), 255)
+                if floodfilled[y, w - 1] == 0:
+                    cv2.floodFill(floodfilled, mask, (w - 1, y), 255)
+
+            # floodfilled 中原本與邊界連通的黑色已變為白色 (255)
+            # 其餘區域保留原樣
+            output = floodfilled
+            
+            output = cv2.morphologyEx(output, cv2.MORPH_DILATE, kernel, iterations=1)
+
+            output = cv2.bitwise_not(output)  # 反轉：黑色區塊變白色，白色區塊變黑色
+            # # 對前景做 connected component analysis
+            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(output, connectivity=8)
+            
+            max_threshold = 170  # 設定最大面積門檻
+            #  把「大區塊」設為背景（即圖中變白色）
+            for i in range(1, num_labels):  # 跳過 index 0：背景
+                area = stats[i, cv2.CC_STAT_AREA]
+                if area > max_threshold:
+                    output[labels == i] = 0  # 設為黑背景（因為 binary 是反轉過的）
+
+
+            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(output, connectivity=8)
+            
+            # 設定面積門檻，過濾大型黑色區塊
+            sorted_areas = np.sort(stats[1:, cv2.CC_STAT_AREA], axis=0)[::-1]
+            # print(f"Sorted areas: {sorted_areas}")
+            drops = np.abs(np.diff(sorted_areas))
+            # print(f"Drops: {drops}")
+            # 找到前5個中最大落差的index
+            max_drop_index = np.argmax(drops[:4]) if len(drops) >= 4 else np.argmax(drops)
+            # print(f"Max drop index: {max_drop_index}")
+            area_threshold = min(sorted_areas[max_drop_index], 50)
+            
+
+
+            #  把「大區塊」設為背景（即圖中變白色）
+            for i in range(1, num_labels):  # 跳過 index 0：背景
+                area = stats[i, cv2.CC_STAT_AREA]
+                if area < area_threshold:
+                    output[labels == i] = 0  # 設為黑背景（因為 binary 是反轉過的）
+                    
+            output = Image.fromarray(output)
+            
+        except Exception as e:
+            logger.debug(f"圖像預處理錯誤: {e}")
+            output = image
+
+        return output
+
     
     def _process_single_image(self, image: Image.Image) -> str:
         """

@@ -330,9 +330,10 @@ class TotalPotionManager:
         total_used_list = []
         
         for manager in self.potion_managers:
-            potion_per_10min, total_used = manager.get_potion_per_10min_data()
-            potion_per_10min_list.append(potion_per_10min)
-            total_used_list.append(total_used)
+            if manager.enabled:
+                potion_per_10min, total_used = manager.get_potion_per_10min_data()
+                potion_per_10min_list.append(potion_per_10min)
+                total_used_list.append(total_used)
             
         return potion_per_10min_list, total_used_list
     
@@ -342,9 +343,10 @@ class TotalPotionManager:
         total_cost_list = []
         
         for manager in self.potion_managers:
-            cost_per_10min, total_cost = manager.get_cost_per_10min_data()
-            cost_per_10min_list.append(cost_per_10min)
-            total_cost_list.append(total_cost)
+            if manager.enabled:
+                cost_per_10min, total_cost = manager.get_cost_per_10min_data()
+                cost_per_10min_list.append(cost_per_10min)
+                total_cost_list.append(total_cost)
             
         return cost_per_10min_list, total_cost_list
 
@@ -354,9 +356,10 @@ class TotalPotionManager:
         total_used_sum = 0
         
         for manager in self.potion_managers:
-            potion_per_10min, total_used = manager.get_potion_per_10min_data()
-            potion_per_10min_sum += potion_per_10min if potion_per_10min is not None else 0
-            total_used_sum += total_used if total_used is not None else 0
+            if manager.enabled:
+                potion_per_10min, total_used = manager.get_potion_per_10min_data()
+                potion_per_10min_sum += potion_per_10min if potion_per_10min is not None else 0
+                total_used_sum += total_used if total_used is not None else 0
         
         return potion_per_10min_sum, total_used_sum
     
@@ -366,8 +369,9 @@ class TotalPotionManager:
         total_cost_sum = 0
         
         for manager in self.potion_managers:
-            cost_per_10min, total_cost = manager.get_cost_per_10min_data()
-            cost_per_10min_sum += cost_per_10min if cost_per_10min is not None else 0
-            total_cost_sum += total_cost if total_cost is not None else 0
-        
+            if manager.enabled:
+                cost_per_10min, total_cost = manager.get_cost_per_10min_data()
+                cost_per_10min_sum += cost_per_10min if cost_per_10min is not None else 0
+                total_cost_sum += total_cost if total_cost is not None else 0
+            
         return cost_per_10min_sum, total_cost_sum

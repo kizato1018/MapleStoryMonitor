@@ -66,9 +66,7 @@ class PotionTrackerWidget(TrackerSubWidget):
                 potion_10min_data, total_used_data = self.manager.get_potion_per_10min_data()
                 potion_10min_text = ""
                 total_used_text = ""
-                for i in range(len(self.manager)):
-                    if not self.manager[i].enabled:
-                        continue
+                for i in range(len(potion_10min_data)):
                     potion_10min_text += f"[{potion_10min_data[i]:,}] " if potion_10min_data[i] is not None else "[0]"
                     total_used_text += f"[{total_used_data[i]:,}] " if total_used_data[i] is not None else "[0]"
             
@@ -84,9 +82,7 @@ class PotionTrackerWidget(TrackerSubWidget):
                 cost_10min_data, total_cost_data = self.manager.get_cost_per_10min_data()
                 cost_10min_text = ""
                 total_cost_text = ""
-                for i in range(len(self.manager)):
-                    if not self.manager[i].enabled:
-                        continue
+                for i in range(len(cost_10min_data)):
                     cost_10min_text += f"[{cost_10min_data[i]:,}] " if cost_10min_data[i] is not None else "[0]"
                     total_cost_text += f"[{total_cost_data[i]:,}] " if total_cost_data[i] is not None else "[0]"
             
