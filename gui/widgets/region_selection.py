@@ -2,11 +2,14 @@
 Region Selection Widget Module
 區域選擇控制元件模組
 """
-
+import ctypes
 import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Optional, Dict, Any, Callable
 import time
+import subprocess
+import platform
+import json
 
 from utils.common import validate_region
 from utils.log import get_logger
@@ -133,19 +136,8 @@ class RegionSelectionWidget:
             # 檢測平台並獲取縮放因子
             import platform
             self.is_macos = platform.system() == 'Darwin'
-            
-            # 獲取 macOS 的縮放因子
-            if self.is_macos:
-                try:
-                    from capture.mac_capture import MacCaptureEngine
-                    self.scale_factor = MacCaptureEngine.get_display_scale_factor()
-                    logger.debug(f"macOS 縮放因子: {self.scale_factor}")
-                except:
-                    self.scale_factor = 2.0  # 預設值
-                    logger.warning("無法獲取縮放因子，使用預設值 2.0")
-            else:
-                self.scale_factor = 1.0
-            
+
+            self.scale_factor = self._get_display_scale_factor()
             self.selection_window = tk.Toplevel(self.parent)
             self.selection_window.title("選取擷取區域")
             self.selection_window.attributes('-topmost', True)
@@ -163,8 +155,8 @@ class RegionSelectionWidget:
                 # 其他系統使用原來的 fullscreen
                 self.selection_window.attributes('-fullscreen', True)
             
-            self.selection_window.attributes('-alpha', 0.3)  # 半透明
-            self.selection_window.configure(bg='black', cursor="cross")
+            self.selection_window.attributes('-alpha', 0.7)  # 半透明
+            self.selection_window.configure(bg='white', cursor="cross")
             
             # 創建畫布覆蓋整個螢幕
             self.selection_canvas = tk.Canvas(
@@ -182,15 +174,12 @@ class RegionSelectionWidget:
             if hasattr(self, 'target_rect') and self.target_rect:
                 left, top, right, bottom = self.target_rect
                 
-                # 在 macOS 上，目標視窗座標已經是實際像素座標，但畫布是邏輯座標
-                if self.is_macos:
-                    # 將實際像素座標轉換為邏輯座標用於畫布顯示
-                    canvas_left = left / self.scale_factor
-                    canvas_top = top / self.scale_factor
-                    canvas_right = right / self.scale_factor
-                    canvas_bottom = bottom / self.scale_factor
-                else:
-                    canvas_left, canvas_top, canvas_right, canvas_bottom = left, top, right, bottom
+
+                # 將實際像素座標轉換為邏輯座標用於畫布顯示
+                canvas_left = left * self.scale_factor
+                canvas_top = top * self.scale_factor
+                canvas_right = right * self.scale_factor
+                canvas_bottom = bottom * self.scale_factor
                 
                 # 繪製目標視窗區域為較亮的顏色
                 self.selection_canvas.create_rectangle(
@@ -239,6 +228,8 @@ class RegionSelectionWidget:
         except Exception as e:
             logger.error(f"創建選取視窗錯誤: {e}")
             import traceback
+
+
             traceback.print_exc()
             messagebox.showerror("錯誤", f"無法創建選取視窗: {e}")
     
@@ -294,18 +285,13 @@ class RegionSelectionWidget:
                 outline="red", width=2, fill="red", stipple="gray50"
             )
             
-            # 計算螢幕座標（考慮縮放因子）
-            if self.is_macos:
-                # 將畫布座標轉換為實際螢幕像素座標
-                screen_start_x = self.start_x * self.scale_factor
-                screen_start_y = self.start_y * self.scale_factor
-                screen_event_x = event.x * self.scale_factor
-                screen_event_y = event.y * self.scale_factor
-            else:
-                screen_start_x = self.start_x
-                screen_start_y = self.start_y
-                screen_event_x = event.x
-                screen_event_y = event.y
+
+            # 將畫布座標轉換為實際螢幕像素座標
+            screen_start_x = self.start_x * self.scale_factor
+            screen_start_y = self.start_y * self.scale_factor
+            screen_event_x = event.x * self.scale_factor
+            screen_event_y = event.y * self.scale_factor
+
             
             # 計算相對於目標視窗的座標
             if hasattr(self, 'target_rect') and self.target_rect:
@@ -326,8 +312,7 @@ class RegionSelectionWidget:
                 )
                 
                 coord_text = f"相對座標 X:{rel_x1}, Y:{rel_y1}, W:{w}, H:{h}"
-                if self.is_macos:
-                    coord_text += f"\n縮放因子: {self.scale_factor}"
+                coord_text += f"\n縮放因子: {self.scale_factor}"
             else:
                 # 如果沒有目標視窗，使用絕對座標
                 x1, y1 = min(screen_start_x, screen_event_x), min(screen_start_y, screen_event_y)
@@ -376,16 +361,12 @@ class RegionSelectionWidget:
                     x1, y1, x2, y2 = coords
                     
                     # 轉換為螢幕座標（考慮縮放因子）
-                    if self.is_macos:
-                        screen_x1 = min(x1, x2) * self.scale_factor
-                        screen_y1 = min(y1, y2) * self.scale_factor
-                        screen_x2 = max(x1, x2) * self.scale_factor
-                        screen_y2 = max(y1, y2) * self.scale_factor
-                    else:
-                        screen_x1 = min(x1, x2)
-                        screen_y1 = min(y1, y2)
-                        screen_x2 = max(x1, x2)
-                        screen_y2 = max(y1, y2)
+
+                    screen_x1 = min(x1, x2) * self.scale_factor
+                    screen_y1 = min(y1, y2) * self.scale_factor
+                    screen_x2 = max(x1, x2) * self.scale_factor
+                    screen_y2 = max(y1, y2) * self.scale_factor
+
                     
                     # 計算相對於目標視窗的座標
                     if hasattr(self, 'target_rect') and self.target_rect:
@@ -456,3 +437,48 @@ class RegionSelectionWidget:
         self.y_var.set(str(y))
         self.w_var.set(str(w))
         self.h_var.set(str(h))
+
+    def _get_display_scale_factor(self):
+        """使用 subprocess 獲取系統顯示縮放比例"""
+        
+        try:
+            system = platform.system()
+            
+            if system == 'Windows':
+                # 使用 subprocess 執行 utils/get_scalor_factor.py
+                result = subprocess.run(
+                    ['python', 'utils/get_scalor_factor.py'],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0:
+                    scale_factor = float(result.stdout.strip())
+                    logger.info(f"從 subprocess 獲取 Windows 縮放因子: {scale_factor}")
+                    return scale_factor
+                else:
+                    logger.warning(f"subprocess 獲取縮放因子失敗: {result.stderr}")
+                    return 1.0
+            else:
+                try:
+                    from Cocoa import NSScreen
+                    main_screen = NSScreen.mainScreen()
+                    if main_screen:
+                        backing_scale_factor = main_screen.backingScaleFactor()
+                        return float(backing_scale_factor)
+                    return 1.0
+                except Exception as e:
+                    logger.warning(f"無法獲取顯示縮放因子: {e}")
+                    # 嘗試另一種方法
+                    try:
+                        import subprocess
+                        result = subprocess.run(['system_profiler', 'SPDisplaysDataType'], 
+                                            capture_output=True, text=True)
+                        if 'Retina' in result.stdout:
+                            return 2.0  # 大多數 Retina 顯示器
+                        return 1.0
+                    except:
+                        return 2.0  # 預設為 2.0，因為大多數現代 Mac 都是 Retina
+        except Exception as e:
+            logger.error(f"獲取顯示縮放比例失敗: {e}")
+            return 1.0
