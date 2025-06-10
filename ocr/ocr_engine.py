@@ -93,9 +93,9 @@ class OCREngine:
             
             # 處理藥水圖像
             for tab_name, image in potion_images.items():
-                Image.Image.save(image, f"tmp/{tab_name}.png")  # 保存圖像以便調試
-                new_image = Image.open(f"tmp/{tab_name}.png")
-                result = self._process_potion_image(new_image, tab_name)
+                # Image.Image.save(image, f"tmp/{tab_name}.png")  # 保存圖像以便調試
+                # new_image = Image.open(f"tmp/{tab_name}.png")
+                result = self._process_potion_image(image, tab_name)
                 if self.result_callback:
                     self.result_callback(tab_name, result)
             
