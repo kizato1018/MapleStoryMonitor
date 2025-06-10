@@ -21,7 +21,7 @@ from ocr.ocr_engine import OCREngine
 from module.hpmp_manager import HPMPManager
 from module.exp_manager import EXPManager
 from module.coin_manager import CoinManager
-from module.potion_manager import PotionManager
+from module.potion_manager import TotalPotionManager
 from utils.common import FrequencyController
 from utils.log import get_logger
 from capture.base_capture import create_capture_engine
@@ -73,7 +73,7 @@ class GameMonitorMainWindow:
         self.hpmp_manager = HPMPManager()
         self.exp_manager = EXPManager()
         self.coin_manager = CoinManager()
-        self.potion_manager = PotionManager()
+        self.potion_manager = TotalPotionManager()
         
         # 標記是否正在載入配置（防止觸發保存）
         self.is_loading_config = True
@@ -87,21 +87,16 @@ class GameMonitorMainWindow:
         self.window_transparency_var = tk.DoubleVar(value=1.0)  # 1.0 = 完全不透明, 0.0 = 完全透明
         self.auto_update_var = tk.BooleanVar(value=True)  # 新增自動更新變數
         
-        # 分頁顯示選項變數
-        self.tab_visibility_vars = {
-            "HP": tk.BooleanVar(value=True),
-            "MP": tk.BooleanVar(value=True),
-            "EXP": tk.BooleanVar(value=True),
-            "金幣": tk.BooleanVar(value=True),
-            "藥水": tk.BooleanVar(value=True)
-        }
         
         # OCR引擎
         self.ocr_engine = OCREngine()
         self.ocr_frequency_controller = FrequencyController(2.0)  # OCR較低頻率
         # 監控標籤頁
         self.tabs = {}
-        self.tabs_names = ["HP", "MP", "EXP", "金幣", "藥水"]
+        self.tabs_names = ["HP", "MP", "EXP", "楓幣", "藥水1", "藥水2", "藥水3", "藥水4", "藥水5", "藥水6", "藥水7", "藥水8"]
+        self.tab_visibility_vars = {
+            tab_name: tk.BooleanVar() for tab_name in self.tabs_names
+        }
         # 設定標籤頁
         self.settings_tab = None
         self.settings_widget = None
@@ -184,65 +179,78 @@ class GameMonitorMainWindow:
         title_label = tk.Label(
             self.overview_frame,
             text="遊戲狀態總覽",
-            font=('Arial', 12, 'bold')  # 從16縮小到14
+            font=('Arial', 12, 'bold')
         )
-        title_label.pack(pady=(5, 0))  # 減少下方間距
+        title_label.pack(pady=(5, 0))
         
         # 結果顯示框架
-        self.results_frame = ttk.LabelFrame(self.overview_frame, text="當前狀態", padding=0)  # 從20縮小到10
-        self.results_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 0))  # 調整間距
+        self.results_frame = ttk.LabelFrame(self.overview_frame, text="當前狀態") 
+        self.results_frame.pack(side=tk.TOP, fill=tk.X, expand=False, padx=20, pady=(0, 5))
         
-        # 創建結果顯示標籤
+        # 創建結果顯示標籤 - 改為動態創建
         self.overview_labels = {}
-        for i, stat_name in enumerate(["HP", "MP", "EXP", "楓幣", "藥水"]):
-            stat_frame = ttk.Frame(self.results_frame)
-            stat_frame.pack(fill=tk.X, pady=0)  # 從5縮小到2
-            
-            ttk.Label(stat_frame, text=f"{stat_name}:", font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=(5, 5))  # 從12縮小到10，調整間距
-            
-            # 設定顏色：HP 紅色, MP 藍色, EXP 黑色, 楓幣 金色, 藥水 綠色
-            color = "black"
-            if stat_name == "HP":
-                color = "red"
-            elif stat_name == "MP":
-                color = "blue"
-            elif stat_name == "楓幣":
-                color = "#DAA520"  # 金色
-            elif stat_name == "藥水":
-                color = "green"
-            value_label = tk.Label(
-                stat_frame,
-                text="N/A",
-                font=('Arial', 10),  # 從12縮小到10
-                fg=color,
-                width=18  # 從20縮小到18
-            )
-            value_label.pack(side=tk.LEFT, padx=(0, 0))  # 調整間距
-            
-            self.overview_labels[stat_name] = value_label
+        self._create_status_labels()
         
-        # OCR狀態顯示
-        status_frame = ttk.Frame(self.results_frame)
-        status_frame.pack(fill=tk.X, pady=(5, 0))  # 調整間距
+        # OCR狀態顯示 - 移到results_frame外面，避免被銷毀
+        self.ocr_status_frame = ttk.Frame(self.overview_frame)
+        self.ocr_status_frame.pack(side=tk.TOP, fill=tk.X, padx=20, pady=(0, 5))
         
-        tk.Label(status_frame, text="OCR狀態:", font=('Arial', 10)).pack(side=tk.LEFT, padx=(5, 0))  # 從12縮小到10
+        tk.Label(self.ocr_status_frame, text="OCR狀態:", font=('Arial', 10)).pack(side=tk.LEFT, padx=(5, 0))
         self.ocr_status_label = tk.Label(
-            status_frame,
+            self.ocr_status_frame,
             text="初始化中...",
-            font=('Arial', 10),  # 從12縮小到10
-            fg='orange'
+            font=('Arial', 10),
         )
-        self.ocr_status_label.pack(side=tk.LEFT, padx=(5, 0))  # 調整間距
+        self.ocr_status_label.pack(side=tk.LEFT, padx=(2, 0))
         
         # EXP計算器
-        self.multi_tracker_frame = ttk.LabelFrame(self.overview_frame, text="多功能追蹤計算器", padding=10)
-        self.multi_tracker_frame.pack(fill=tk.X, padx=20, pady=10)
+        self.multi_tracker_frame = ttk.LabelFrame(self.overview_frame, text="多功能追蹤計算器")
+        self.multi_tracker_frame.pack(side=tk.TOP, fill=tk.X, padx=20)
         
         self.multi_tracker = MultiTrackerWidget(self.multi_tracker_frame, 
                                                 self.exp_manager, 
                                                 self.coin_manager, 
                                                 self.potion_manager)
         self.multi_tracker.pack(fill=tk.X)
+        
+        tk.Frame(self.overview_frame).pack(side=tk.TOP, fill=tk.BOTH, expand=True)  # 分隔線
+
+    def _create_status_labels(self):
+        """動態創建狀態標籤"""
+        # 清除現有的標籤 - 只清除results_frame內的widget
+        for widget in self.results_frame.winfo_children():
+            widget.destroy()
+        
+        self.overview_labels.clear()
+        
+        # 只為可見的分頁創建標籤
+        for stat_name in self.tabs_names:
+            if self.tab_visibility_vars[stat_name].get():
+                stat_frame = ttk.Frame(self.results_frame)
+                stat_frame.pack(fill=tk.X, pady=0)
+                
+                ttk.Label(stat_frame, text=f"{stat_name}:", font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=(5, 5)) 
+                
+                # 設定顏色：HP 紅色, MP 藍色, EXP 黑色, 楓幣 金色, 藥水 綠色
+                color = "black"
+                if stat_name == "HP":
+                    color = "red"
+                elif stat_name == "MP":
+                    color = "blue"
+                elif stat_name == "楓幣":
+                    color = "#DAA520"  # 金色
+                elif "藥水" in stat_name:
+                    color = "green"
+                value_label = tk.Label(
+                    stat_frame,
+                    text="N/A",
+                    font=('Arial', 10), 
+                    fg=color,
+                    width=18
+                )
+                value_label.pack(side=tk.LEFT, padx=(0, 0)) 
+                
+                self.overview_labels[stat_name] = value_label
 
     def _update_fps_label(self, *args):
         """更新全域FPS標籤"""
@@ -253,7 +261,7 @@ class GameMonitorMainWindow:
         """更新狀態顯示的可見性"""
         if hasattr(self, 'results_frame'):
             if self.show_status_var.get():
-                self.results_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10, before=self.multi_tracker_frame)
+                self.results_frame.pack(side=tk.TOP,fill=tk.X, expand=False, padx=20, before=self.multi_tracker_frame)
             else:
                 self.results_frame.pack_forget()
         self._save_config_if_ready()
@@ -262,7 +270,7 @@ class GameMonitorMainWindow:
         """更新追蹤計算器的可見性"""
         if hasattr(self, 'multi_tracker_frame'):
             if self.show_tracker_var.get():
-                self.multi_tracker_frame.pack(fill=tk.X, padx=20, pady=10)
+                self.multi_tracker_frame.pack(side=tk.TOP, fill=tk.X, padx=20)
             else:
                 self.multi_tracker_frame.pack_forget()
         self._save_config_if_ready()
@@ -373,7 +381,17 @@ class GameMonitorMainWindow:
                     self.notebook.select(0)
                 except:
                     pass
-        
+
+        # 重新創建狀態標籤以匹配可見的分頁
+        if hasattr(self, 'results_frame'):
+            self._create_status_labels()
+            
+        for i in range(len(self.potion_manager)):
+            potion_tab_name = f"藥水{i+1}"
+            if potion_tab_name in self.tabs:
+                potion_manager = self.potion_manager[i]
+                potion_manager.enabled = self.tab_visibility_vars[potion_tab_name].get()
+
         self._save_config_if_ready()
     
     def _create_monitor_tab(self, tab_name: str):
@@ -390,6 +408,12 @@ class GameMonitorMainWindow:
         
         self.tabs[tab_name] = tab
         frame = tab._create_tab()
+        
+        # 增加藥水單價輸入到藥水標籤頁
+        if "藥水" in tab_name:
+            index = int(tab_name[-1]) - 1
+            potion_manager = self.potion_manager[index]
+            tab.add_potion_cost_input(potion_manager.set_unit_cost)
         
         # 儲存 frame 的引用到 tab 對象中，方便後續使用
         tab._frame = frame
@@ -512,44 +536,46 @@ class GameMonitorMainWindow:
             else:
                 exp_formatted = "N/A"
             
-            # 更新對應標籤頁的結果（使用原始OCR結果）
+            # 更新對應標籤頁的結果
             if tab_name in self.tabs:
-                self.tabs[tab_name].set_ocr_result(result)
+                self.tabs[tab_name].set_ocr_result(exp_formatted)
               # 更新總覽頁面（使用格式化的有效結果）
             if tab_name in self.overview_labels:
                 self.overview_labels[tab_name].config(text=exp_formatted)
-        elif tab_name == "金幣":
-            # 更新金幣管理器
+        elif tab_name == "楓幣":
+            # 更新楓幣管理器
             self.coin_manager.update(result)
                 
-            # 更新對應標籤頁的結果（使用原始OCR結果）
+            # 更新對應標籤頁的結果
             if tab_name in self.tabs:
                 self.tabs[tab_name].set_ocr_result(result)
             
             # 更新總覽頁面
-            if "楓幣" in self.overview_labels:
-                self.overview_labels["楓幣"].config(text=result)
+            if tab_name in self.overview_labels:
+                self.overview_labels[tab_name].config(text=result)
                 
-        elif tab_name == "藥水":
+        elif "藥水" in tab_name:
             # 更新藥水管理器
-            self.potion_manager.update(result)
-            potion_status = self.potion_manager.get_status()
+            index = int(tab_name[-1]) - 1  # 假設標籤頁名稱為 "藥水1", "藥水2" 等
+            potion_manager = self.potion_manager[index]
+            potion_manager.update(result)
+            potion_status = potion_manager.get_status()
             
             if potion_status:
-                potion_value = potion_status.get("current_potion_value")
+                potion_value = potion_status.get("potion")
                 if potion_value is not None:
                     potion_count = str(potion_value)
                 else:
                     potion_count = "N/A"
-                logger.debug(f"[PARSE DEBUG] 藥水 parse: {result}")
+                logger.debug(f"[PARSE DEBUG] {tab_name} parse: {potion_count}")
                 
             # 更新對應標籤頁的結果（使用原始OCR結果）
             if tab_name in self.tabs:
                 self.tabs[tab_name].set_ocr_result(result)
             
             # 更新總覽頁面
-            if "藥水" in self.overview_labels:
-                self.overview_labels["藥水"].config(text=potion_count)
+            if tab_name in self.overview_labels:
+                self.overview_labels[tab_name].config(text=potion_count)
         
         else:
             # 其他標籤頁直接更新
@@ -585,12 +611,14 @@ class GameMonitorMainWindow:
             # 載入全域配置
             global_config = self.config_manager.get_global_config()
             
-            # 載入視窗大小配置
+            # 載入視窗大小和位置配置
             window_size = self.config_manager.get_window_size()
-            self.root.geometry(f"{window_size['width']}x{window_size['height']}")
+            window_position = self.config_manager.get_window_position()
+            self.root.geometry(f"{window_size['width']}x{window_size['height']}+{window_position['x']}+{window_position['y']}")
             self.root.update_idletasks()  # 確保視窗大小更新
             self.root.deiconify()
             logger.info(f"載入視窗大小: {window_size['width']}x{window_size['height']}")
+            logger.info(f"載入視窗位置: {window_position['x']}, {window_position['y']}")
             
             # 處理FPS配置（支援舊格式）
             fps = global_config.get('fps', self.config_manager.config_data.get('global_fps', 5.0))
@@ -686,17 +714,18 @@ class GameMonitorMainWindow:
                            tab.region_widget.w_var, tab.region_widget.h_var]:
                     var.trace_add('write', lambda *args: self._save_config_if_ready())
                     
-        # 綁定視窗大小變更事件
+        # 綁定視窗大小和位置變更事件
         if hasattr(self, 'is_window_configure_bound'):
             if self.is_window_configure_bound:
-                self.root.bind('<Configure>', lambda event: self._save_window_size())
+                self.root.bind('<Configure>', self._on_window_configure)
                 self.is_window_configure_bound = False
-                logger.debug("已綁定視窗大小變更事件")
+                logger.debug("已綁定視窗大小和位置變更事件")
 
-    def _save_config_if_ready(self):
-        """只有在配置載入完成後才保存配置"""
-        if not self.is_loading_config:
-            self._save_config()
+    def _on_window_configure(self, event):
+        """視窗配置變更事件處理（包括大小和位置）"""
+        # 只處理主視窗的事件，忽略子控件的事件
+        if event.widget == self.root:
+            self._save_window_geometry()
 
     def _save_window_size(self):
         """儲存視窗大小"""
@@ -709,6 +738,22 @@ class GameMonitorMainWindow:
             self._save_config()
         except Exception as e:
             logger.error(f"儲存視窗大小失敗: {e}")
+
+    def _save_window_geometry(self):
+        """儲存視窗大小和位置"""
+        try:
+            width = self.root.winfo_width()
+            height = self.root.winfo_height()
+            x = self.root.winfo_x()
+            y = self.root.winfo_y()
+            
+            self.config_manager.set_window_size(width, height)
+            self.config_manager.set_window_position(x, y)
+            logger.debug(f"儲存視窗幾何: {width}x{height}+{x}+{y}")
+            # 觸發完整配置保存
+            self._save_config()
+        except Exception as e:
+            logger.error(f"儲存視窗幾何失敗: {e}")
 
     def _save_config(self):
         """儲存配置"""
@@ -748,7 +793,10 @@ class GameMonitorMainWindow:
         
         # 儲存到檔案
         self.config_manager.save_config()
-    
+    def _save_config_if_ready(self):
+        """只有在配置載入完成後才保存配置"""
+        if not self.is_loading_config:
+            self._save_config()
     def _on_closing(self):
         """視窗關閉事件處理"""
         self._save_config()

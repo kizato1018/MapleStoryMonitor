@@ -16,23 +16,21 @@ class PotionTrackerWidget(TrackerSubWidget):
     """藥水追蹤子元件"""
     
     def __init__(self, parent_frame, timer: MonitorTimer):
+        self.is_total = tk.BooleanVar(value=True)
         super().__init__(parent_frame, "藥水追蹤", timer)
     
     def _create_content(self):
         """創建藥水追蹤內容"""
+        self.total_checkbox = ttk.Checkbutton(
+            self.checkbox_frame, 
+            text="總計", 
+            variable=self.is_total,
+            command=self.update_display
+        )
+        self.total_checkbox.pack(side=tk.LEFT, padx=5, pady=2)
+        
         content_frame = ttk.Frame(self.main_frame)
         content_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
-        
-        # 成本設定
-        cost_frame = ttk.Frame(content_frame)
-        cost_frame.pack(fill=tk.X, pady=2)
-        
-        ttk.Label(cost_frame, text="單價:").pack(side=tk.LEFT)
-        self.cost_var = tk.StringVar(value="0")
-        cost_entry = ttk.Entry(cost_frame, textvariable=self.cost_var, width=10)
-        cost_entry.pack(side=tk.LEFT, padx=2)
-        cost_entry.bind('<Return>', self._on_cost_changed)
-        cost_entry.bind('<FocusOut>', self._on_cost_changed)
         
         # 使用量顯示
         self.labels["potion_10min"] = ttk.Label(content_frame, text="10分鐘使用量: 未啟用")
@@ -48,15 +46,6 @@ class PotionTrackerWidget(TrackerSubWidget):
         self.labels["total_cost"] = ttk.Label(content_frame, text="總累計成本: 未啟用")
         self.labels["total_cost"].pack(anchor=tk.W)
     
-    def _on_cost_changed(self, event=None):
-        """成本設定改變時的處理"""
-        if self.manager:
-            try:
-                cost = float(self.cost_var.get())
-                self.manager.set_unit_cost(cost)
-                logger.info(f"藥水單價已設定為: {cost}")
-            except ValueError:
-                logger.warning("無效的成本值")
     
     def update_display(self):
         """更新藥水顯示"""
@@ -69,30 +58,40 @@ class PotionTrackerWidget(TrackerSubWidget):
         
         try:
             # 使用量數據
-            potion_10min_data, total_used_data = self.manager.get_potion_per_10min_data()
-            
-            if potion_10min_data is not None:
-                self.labels["potion_10min"].config(text=f"10分鐘使用量: {potion_10min_data:,}")
+            if self.is_total.get():
+                potion_10min_data, total_used_data = self.manager.get_potion_per_10min_total_data()
+                potion_10min_text = f"{potion_10min_data:,}" if potion_10min_data is not None else "計算中..."
+                total_used_text = f"{total_used_data:,}" if total_used_data is not None else "計算中..."
             else:
-                self.labels["potion_10min"].config(text="10分鐘使用量: 計算中...")
+                potion_10min_data, total_used_data = self.manager.get_potion_per_10min_data()
+                potion_10min_text = ""
+                total_used_text = ""
+                for i in range(len(self.manager)):
+                    if not self.manager[i].enabled:
+                        continue
+                    potion_10min_text += f"[{potion_10min_data[i]:,}] " if potion_10min_data[i] is not None else "[0]"
+                    total_used_text += f"[{total_used_data[i]:,}] " if total_used_data[i] is not None else "[0]"
             
-            if total_used_data is not None:
-                self.labels["total_used"].config(text=f"總累計使用量: {total_used_data:,}")
-            else:
-                self.labels["total_used"].config(text="總累計使用量: 計算中...")
+            self.labels["potion_10min"].config(text=f"10分鐘使用量: {potion_10min_text}")
+            self.labels["total_used"].config(text=f"總累計使用量: {total_used_text}")
             
             # 成本數據
-            cost_10min_data, total_cost_data = self.manager.get_cost_per_10min_data()
-            
-            if cost_10min_data is not None:
-                self.labels["cost_10min"].config(text=f"10分鐘成本: {cost_10min_data:,.0f}")
+            if self.is_total.get():
+                cost_10min_data, total_cost_data = self.manager.get_cost_per_10min_total_data()
+                cost_10min_text = f"{cost_10min_data:,}" if cost_10min_data is not None else "計算中..."
+                total_cost_text = f"{total_cost_data:,}" if total_cost_data is not None else "計算中..."
             else:
-                self.labels["cost_10min"].config(text="10分鐘成本: 計算中...")
+                cost_10min_data, total_cost_data = self.manager.get_cost_per_10min_data()
+                cost_10min_text = ""
+                total_cost_text = ""
+                for i in range(len(self.manager)):
+                    if not self.manager[i].enabled:
+                        continue
+                    cost_10min_text += f"[{cost_10min_data[i]:,}] " if cost_10min_data[i] is not None else "[0]"
+                    total_cost_text += f"[{total_cost_data[i]:,}] " if total_cost_data[i] is not None else "[0]"
             
-            if total_cost_data is not None:
-                self.labels["total_cost"].config(text=f"總累計成本: {total_cost_data:,.0f}")
-            else:
-                self.labels["total_cost"].config(text="總累計成本: 計算中...")
-                
+            self.labels["cost_10min"].config(text=f"10分鐘成本: {cost_10min_text}")
+            self.labels["total_cost"].config(text=f"總累計成本: {total_cost_text}")
+            
         except Exception as e:
             logger.error(f"更新藥水顯示時發生錯誤: {e}")

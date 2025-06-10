@@ -2,6 +2,9 @@ import re
 from typing import Optional, List, Tuple
 from collections import deque
 from module.monitor_timer import MonitorTimer
+from utils.log import get_logger
+
+logger = get_logger(__name__)
 
 class PotionManager:
     """負責處理藥水使用量相關邏輯"""
@@ -16,6 +19,7 @@ class PotionManager:
         self.unit_cost = 0  # 藥水單價
         self.last_potion_value = None  # 上一次的藥水值，用於檢測補充
         self.error_threshold = 50  # 當前值小於上一次值的容錯範圍，默認為10個單位
+        self.enabled = False
 
     def start_tracking(self):
         """開始追蹤藥水使用量"""
@@ -57,9 +61,16 @@ class PotionManager:
         self.total_used = 0
         self.potion_history.clear()
 
-    def set_unit_cost(self, cost: float):
+    def set_unit_cost(self, cost: str):
         """設定藥水單價"""
-        self.unit_cost = cost
+        try:
+            cost = int(cost)
+            if cost < 0:
+                logger.warning(f"無效的藥水單價: {cost}. 單價不能為負數。")
+            self.unit_cost = cost
+            logger.info(f"藥水單價已設定為: {cost}")
+        except ValueError as e:
+            logger.error(f"無效的藥水單價: {e}. 請確保輸入為有效的正整術。")
 
     def update(self, potion_value: str):
         """更新藥水數量"""
@@ -201,7 +212,7 @@ class PotionManager:
         
         return potion_10min_data, total_used
 
-    def get_cost_per_10min_data(self) -> Tuple[Optional[float], Optional[float]]:
+    def get_cost_per_10min_data(self) -> Tuple[Optional[int], Optional[int]]:
         """
         計算10分鐘成本和總累計成本數據
         Returns:
@@ -273,7 +284,7 @@ class PotionManager:
         timer_status = self.timer.get_status()
         
         return {
-            "Potion": self.potion,
+            "potion": self.potion,
             "is_tracking": timer_status["is_tracking"],
             "is_paused": timer_status["is_paused"],
             "elapsed_time": elapsed_time,
@@ -290,3 +301,73 @@ class PotionManager:
             "total_used_amount": self.total_used,
             "timer_status": timer_status
         }
+
+class TotalPotionManager:
+    """負責管理多個 PotionManager 實例"""
+    
+    def __init__(self):
+        self.potion_managers: List[PotionManager] = [PotionManager() for _ in range(8)]
+    
+    def __iter__(self):
+        """迭代 PotionManager 列表"""
+        return iter(self.potion_managers)
+    
+    def __getitem__(self, index: int) -> PotionManager:
+        """獲取指定索引的 PotionManager"""
+        return self.potion_managers[index]
+    
+    def __len__(self) -> int:
+        """獲取 PotionManager 的數量"""
+        return len(self.potion_managers)
+    
+    def get_all_status(self) -> List[dict]:
+        """獲取所有 PotionManager 的狀態"""
+        return [manager.get_status() for manager in self.potion_managers]
+    
+    def get_potion_per_10min_data(self) -> Tuple[List[Optional[str]], List[Optional[str]]]:
+        """獲取所有 PotionManager 的 10 分鐘使用量和總累計使用量"""
+        potion_per_10min_list = []
+        total_used_list = []
+        
+        for manager in self.potion_managers:
+            potion_per_10min, total_used = manager.get_potion_per_10min_data()
+            potion_per_10min_list.append(potion_per_10min)
+            total_used_list.append(total_used)
+            
+        return potion_per_10min_list, total_used_list
+    
+    def get_cost_per_10min_data(self) -> Tuple[List[Optional[str]], List[Optional[str]]]:
+        """獲取所有 PotionManager 的 10 分鐘成本和總累計成本"""
+        cost_per_10min_list = []
+        total_cost_list = []
+        
+        for manager in self.potion_managers:
+            cost_per_10min, total_cost = manager.get_cost_per_10min_data()
+            cost_per_10min_list.append(cost_per_10min)
+            total_cost_list.append(total_cost)
+            
+        return cost_per_10min_list, total_cost_list
+
+    def get_potion_per_10min_total_data(self) -> Tuple[Optional[str], Optional[str]]:
+        """獲取所有 PotionManager 的 10 分鐘使用量和總累計使用量（總計）"""
+        potion_per_10min_sum = 0
+        total_used_sum = 0
+        
+        for manager in self.potion_managers:
+            potion_per_10min, total_used = manager.get_potion_per_10min_data()
+            potion_per_10min_sum += potion_per_10min if potion_per_10min is not None else 0
+            total_used_sum += total_used if total_used is not None else 0
+        
+        return potion_per_10min_sum, total_used_sum
+    
+    def get_cost_per_10min_total_data(self) -> Tuple[Optional[str], Optional[str]]:
+        """獲取所有 PotionManager 的 10 分鐘成本和總累計成本（總計）"""
+        cost_per_10min_sum = 0
+        total_cost_sum = 0
+        
+        for manager in self.potion_managers:
+            cost_per_10min, total_cost = manager.get_cost_per_10min_data()
+            cost_per_10min_sum += cost_per_10min if cost_per_10min is not None else 0
+            total_cost_sum += total_cost if total_cost is not None else 0
+        
+        return cost_per_10min_sum, total_cost_sum

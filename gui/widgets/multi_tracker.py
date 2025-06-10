@@ -5,10 +5,10 @@ Multi-Tracker Calculator Widget
 
 import tkinter as tk
 from tkinter import ttk
-from typing import Optional
+from typing import Optional, List
 from module.exp_manager import EXPManager
 from module.coin_manager import CoinManager
-from module.potion_manager import PotionManager
+from module.potion_manager import TotalPotionManager
 from module.monitor_timer import MonitorTimer
 from gui.widgets.exp_tracker import EXPTrackerWidget
 from gui.widgets.coin_tracker import CoinTrackerWidget
@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 class MultiTrackerWidget:
     """多功能追蹤計算器主元件"""
     
-    def __init__(self, parent, exp_manager: Optional[EXPManager] = None, coin_manager: Optional[CoinManager] = None, potion_manager: Optional[PotionManager] = None):
+    def __init__(self, parent, exp_manager: Optional[EXPManager] = None, coin_manager: Optional[CoinManager] = None, potion_manager: Optional[TotalPotionManager] = None):
         self.parent = parent
         self.timer = MonitorTimer()  # 共用計時器
         
@@ -33,7 +33,8 @@ class MultiTrackerWidget:
         # 將共用計時器設定給各管理器
         self.exp_manager.timer = self.timer
         self.coin_manager.timer = self.timer
-        self.potion_manager.timer = self.timer
+        for potion_manager in self.potion_manager:
+            potion_manager.timer = self.timer
         
         # UI 元件
         self.main_frame = None
@@ -228,7 +229,8 @@ class MultiTrackerWidget:
         if self.coin_widget.is_enabled():
             self.coin_manager.start_tracking()
         if self.potion_widget.is_enabled():
-            self.potion_manager.start_tracking()
+            for potion_manager in self.potion_manager:
+                potion_manager.start_tracking()
         
         self.start_button.config(text="暫停")
         logger.info("多功能追蹤已開始")
@@ -242,7 +244,8 @@ class MultiTrackerWidget:
         if self.coin_widget.is_enabled():
             self.coin_manager.pause_tracking()
         if self.potion_widget.is_enabled():
-            self.potion_manager.pause_tracking()
+            for potion_manager in self.potion_manager:
+                potion_manager.pause_tracking()
         
         self.start_button.config(text="開始")
         logger.info("多功能追蹤已暫停")
@@ -256,7 +259,8 @@ class MultiTrackerWidget:
         if self.coin_widget.is_enabled():
             self.coin_manager.resume_tracking()
         if self.potion_widget.is_enabled():
-            self.potion_manager.resume_tracking()
+            for potion_manager in self.potion_manager:
+                potion_manager.resume_tracking()
         
         self.start_button.config(text="暫停")
         logger.info("多功能追蹤已恢復")
@@ -266,7 +270,8 @@ class MultiTrackerWidget:
         self.timer.reset_tracking()
         self.exp_manager.reset_tracking()
         self.coin_manager.reset_tracking()
-        self.potion_manager.reset_tracking()
+        for potion_manager in self.potion_manager:
+            potion_manager.reset_tracking()
         
         self.start_button.config(text="開始")
         logger.info("多功能追蹤已重置")
@@ -307,20 +312,22 @@ class MultiTrackerWidget:
         # 每秒更新一次
         self.parent.after(1000, self._update_display)
     
-    def update_exp(self, exp_value: str):
-        """更新經驗值"""
-        if self.exp_widget.is_enabled():
-            self.exp_manager.update(exp_value)
+    # 應該沒有用
+    # def update_exp(self, exp_value: str):
+    #     """更新經驗值"""
+    #     if self.exp_widget.is_enabled():
+    #         self.exp_manager.update(exp_value)
     
-    def update_coin(self, coin_value: str):
-        """更新楓幣值"""
-        if self.coin_widget.is_enabled():
-            self.coin_manager.update(coin_value)
+    # def update_coin(self, coin_value: str):
+    #     """更新楓幣值"""
+    #     if self.coin_widget.is_enabled():
+    #         self.coin_manager.update(coin_value)
     
-    def update_potion(self, potion_value: str):
-        """更新藥水值"""
-        if self.potion_widget.is_enabled():
-            self.potion_manager.update(potion_value)
+    # def update_potion(self, potion_value: str):
+    #     """更新藥水值"""
+    #     if self.potion_widget.is_enabled():
+    #         for potion_manager in self.potion_managers:
+    #             potion_manager.update(potion_value)
     
     def pack(self, **kwargs):
         """打包主元件"""

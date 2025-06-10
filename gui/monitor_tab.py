@@ -47,17 +47,22 @@ class GameMonitorTab:
         # 主框架
         main_frame = ttk.Frame(self.parent)
         
-        # 左側控制區域
-        control_frame = ttk.Frame(main_frame)
-        control_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # 控制區域
+        self.control_frame = ttk.Frame(main_frame)
+        self.control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # 區域選擇元件
-        self.region_widget = RegionSelectionWidget(control_frame, None)
+        self.region_widget = RegionSelectionWidget(self.control_frame, None)
         self.region_widget.set_target_window_callback(self.get_window_info_callback)
         self.region_widget.pack(fill=tk.X, pady=(0, 10))
+            
+        
+        # 顯示區域
+        self.display_frame = ttk.LabelFrame(main_frame, text="顯示區域", padding=10)
+        self.display_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # OCR結果顯示
-        result_frame = ttk.LabelFrame(control_frame, text="辨識結果", padding=10)
+        result_frame = ttk.LabelFrame(self.display_frame, text="辨識結果", padding=10)
         result_frame.pack(fill=tk.X, pady=(0, 10))
 
         self.result_label = tk.Label(
@@ -72,13 +77,25 @@ class GameMonitorTab:
         self.result_label.pack(fill=tk.X)
         
         # 預覽區域（移到OCR結果下方）
-        preview_frame = ttk.LabelFrame(control_frame, text="預覽畫面", padding=5)
+        preview_frame = ttk.LabelFrame(self.display_frame, text="預覽畫面", padding=5)
         preview_frame.pack(fill=tk.BOTH, expand=True)
         
         self.preview_widget = PreviewWidget(preview_frame)
         self.preview_widget.pack(fill=tk.BOTH, expand=True)
         
         return main_frame
+    
+    def add_potion_cost_input(self, on_cost_changed: Optional[Callable] = None):
+        """添加藥水單價輸入框"""
+        cost_frame = ttk.Frame(self.control_frame)
+        cost_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(cost_frame, text="藥水單價:").pack(side=tk.LEFT)
+        self.potion_cost_var = tk.StringVar(value="0")
+        cost_entry = ttk.Entry(cost_frame, textvariable=self.potion_cost_var, width=10)
+        cost_entry.pack(side=tk.LEFT, padx=2)
+        cost_entry.bind('<Return>', lambda e: on_cost_changed(self.potion_cost_var.get()))
+        cost_entry.bind('<FocusOut>', lambda e: on_cost_changed(self.potion_cost_var.get()))
     
     def start_capture(self):
         """開始擷取"""

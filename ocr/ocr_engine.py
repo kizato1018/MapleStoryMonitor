@@ -75,7 +75,7 @@ class OCREngine:
         current_time = time.time()
         if current_time - self.last_ocr_time < self.ocr_interval:
             return
-        
+
         try:
             # 過濾有效圖像
             valid_images = {name: img for name, img in images_dict.items() if img is not None}
@@ -95,8 +95,13 @@ class OCREngine:
                 
                 # 分配結果給各個標籤
                 for tab_name, result in merged_results.items():
+                    # 如果結果為"無法識別"，則嘗試單獨處理該圖像
+                    if result == "無法識別":
+                        result = self._process_single_image(valid_images[tab_name])
+                    
                     if self.result_callback:
                         self.result_callback(tab_name, result)
+                    
             
             self.last_ocr_time = current_time
             

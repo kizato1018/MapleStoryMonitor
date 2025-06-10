@@ -36,14 +36,17 @@ class TrackerSubWidget:
         self.main_frame.configure(width=150)
         self.main_frame.grid_propagate(False)  # 防止自動縮小
         
+        self.checkbox_frame = ttk.Frame(self.main_frame)
+        self.checkbox_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        
         # 啟用checkbox
         self.checkbox = ttk.Checkbutton(
-            self.main_frame, 
+            self.checkbox_frame, 
             text="啟用", 
             variable=self.enabled,
             command=self._on_enable_changed
         )
-        self.checkbox.pack(anchor=tk.W, padx=5, pady=2)
+        self.checkbox.pack(side=tk.LEFT, padx=5, pady=2)
         
         # 子類別實作具體內容
         self._create_content()

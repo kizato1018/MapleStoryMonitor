@@ -192,3 +192,11 @@ class ConfigManager:
     def set_window_size(self, width: int, height: int) -> None:
         """設定視窗大小"""
         self.set_global_config("window_size", {"width": width, "height": height})
+    
+    def get_window_position(self) -> Dict[str, int]:
+        """獲取視窗位置設定"""
+        return self.get_global_config().get("window_position", {"x": 100, "y": 100})
+    
+    def set_window_position(self, x: int, y: int) -> None:
+        """設定視窗位置"""
+        self.set_global_config("window_position", {"x": x, "y": y})
