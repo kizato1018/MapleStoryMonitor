@@ -249,7 +249,7 @@ class OCREngine:
                 paragraph=False,
                 text_threshold=0.6,
                 link_threshold=0.5,
-                low_text=0.5,
+                low_text=0.6,
                 detail=1
             )
             bbox, text, confidence = self._potions_postprocess_result(result)
