@@ -8,6 +8,7 @@ import ctypes
 import sys
 from typing import Optional, Dict, Any, Tuple, List
 from PIL import Image
+import subprocess
 from utils.log import get_logger
 
 logger = get_logger(__name__)
@@ -104,7 +105,7 @@ class WindowsCaptureEngine(BaseCaptureEngine):
                 return None
 
             # 取得視窗大小與座標
-            left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+            left, top, right, bottom = self.get_window_rect(hwnd)
             window_width = right - left
             window_height = bottom - top
 
@@ -206,7 +207,35 @@ class WindowsCaptureEngine(BaseCaptureEngine):
         
         try:
             if self.is_window_valid(window_handle):
-                return win32gui.GetWindowRect(window_handle)
+                # 獲取視窗矩形區域
+                left, top, right, bottom = win32gui.GetWindowRect(window_handle)
+                scale_factor = self.get_display_scale_factor()
+                left = int(left * scale_factor)
+                top = int(top * scale_factor)
+                right = int(right * scale_factor)
+                bottom = int(bottom * scale_factor)
+                return (left, top, right, bottom)
         except Exception as e:
             logger.error(f"獲取視窗矩形錯誤: {e}")
         return None
+
+    @staticmethod
+    def get_display_scale_factor() -> float:
+        """獲取顯示縮放因子（靜態方法，可被外部調用）"""
+        try:
+            result = subprocess.run(
+                ['python', 'utils/get_scalor_factor.py'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                scale_factor = float(result.stdout.strip())
+                logger.info(f"從 subprocess 獲取 Windows 縮放因子: {scale_factor}")
+                return scale_factor
+            else:
+                logger.warning(f"subprocess 獲取縮放因子失敗: {result.stderr}")
+                return 1.0
+        except Exception as e:
+            logger.error(f"獲取 Windows 縮放因子錯誤: {e}")
+            return 1.0

@@ -176,10 +176,10 @@ class RegionSelectionWidget:
                 
 
                 # 將實際像素座標轉換為邏輯座標用於畫布顯示
-                canvas_left = left * self.scale_factor
-                canvas_top = top * self.scale_factor
-                canvas_right = right * self.scale_factor
-                canvas_bottom = bottom * self.scale_factor
+                canvas_left = left / self.scale_factor
+                canvas_top = top / self.scale_factor
+                canvas_right = right / self.scale_factor
+                canvas_bottom = bottom / self.scale_factor
                 
                 # 繪製目標視窗區域為較亮的顏色
                 self.selection_canvas.create_rectangle(
@@ -288,10 +288,10 @@ class RegionSelectionWidget:
             title_bar_offset = 0
 
             # 將畫布座標轉換為實際螢幕像素座標
-            screen_start_x = self.start_x * self.scale_factor
-            screen_start_y = (self.start_y + title_bar_offset) * self.scale_factor
-            screen_event_x = event.x * self.scale_factor
-            screen_event_y = (event.y + title_bar_offset) * self.scale_factor
+            screen_start_x = int(self.start_x * self.scale_factor)
+            screen_start_y = int((self.start_y + title_bar_offset) * self.scale_factor)
+            screen_event_x = int(event.x * self.scale_factor)
+            screen_event_y = int((event.y + title_bar_offset) * self.scale_factor)
 
             
             # 計算相對於目標視窗的座標
@@ -369,15 +369,16 @@ class RegionSelectionWidget:
                     y1 += title_bar_offset
                     y2 += title_bar_offset
 
-                    screen_x1 = min(x1, x2) * self.scale_factor
-                    screen_y1 = min(y1, y2) * self.scale_factor
-                    screen_x2 = max(x1, x2) * self.scale_factor
-                    screen_y2 = max(y1, y2) * self.scale_factor
+                    screen_x1 = int(min(x1, x2) * self.scale_factor)
+                    screen_y1 = int(min(y1, y2) * self.scale_factor)
+                    screen_x2 = int(max(x1, x2) * self.scale_factor)
+                    screen_y2 = int(max(y1, y2) * self.scale_factor)
 
                     
                     # 計算相對於目標視窗的座標
                     if hasattr(self, 'target_rect') and self.target_rect:
                         window_left, window_top, window_right, window_bottom = self.target_rect
+                        
                         # 轉換為相對座標
                         rel_x = int(screen_x1 - window_left)
                         rel_y = int(screen_y1 - window_top)
@@ -389,6 +390,7 @@ class RegionSelectionWidget:
                         rel_x, rel_y, w, h = validate_region(rel_x, rel_y, w, h, window_width, window_height)
                         # 設定區域
                         self.set_region(rel_x, rel_y, w, h)
+                        logger.debug(f"視窗大小: 寬={window_width}, 高={window_height}")
                         logger.debug(f"設定區域: x={rel_x}, y={rel_y}, w={w}, h={h}")
                         # 關閉選取視窗
                         self._close_selection_window()
