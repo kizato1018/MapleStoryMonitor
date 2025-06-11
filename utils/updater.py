@@ -8,6 +8,8 @@ import shutil
 import tempfile
 import json
 import tkinter as tk
+import platform
+
 from tkinter import messagebox
 from pathlib import Path
 from utils.log import get_logger
@@ -151,6 +153,7 @@ def read_config():
         logger.error(f"讀取配置檔案失敗: {e}")
         return False
 
+
 def update_config(auto_update):
     """更新配置檔案中的auto_update設定"""
     try:
@@ -160,13 +163,13 @@ def update_config(auto_update):
         if config_file.exists():
             with open(config_file, 'r', encoding='utf-8') as f:
                 config = json.load(f)
+        if 'global' in config and 'auto_update' in config['global']:
+            config['global']['auto_update'] = auto_update
         
-        config['auto_update'] = auto_update
-        
-        with open(config_file, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-        
-        logger.info(f"已更新auto_update設定為: {auto_update}")
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+            
+            logger.info(f"已更新auto_update設定為: {auto_update}")
     except Exception as e:
         logger.error(f"更新配置檔案失敗: {e}")
 
@@ -193,9 +196,8 @@ def show_update_dialog(remote_ver):
     root.resizable(False, False)
     root.withdraw()  # 先隱藏視窗
     try:
-        import platform
-        import ctypes
         if platform.system() == "Windows":
+            import ctypes
             myappid = 'mycompany.myapp.subapp.1.0'  # 任意唯一值
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
             icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "images", "icon.ico")
@@ -242,15 +244,27 @@ def show_update_dialog(remote_ver):
     button_frame = tk.Frame(root)
     button_frame.pack(pady=5)
     
+    green = "#4CAF50"  # 綠色
+    gray = "#757575"  # 灰色
     # 更新按鈕 (顯眼的綠色)
+    if platform.system() == "Windows":
+        confirm_bg = green
+        confirm_fg = "white"
+        cancel_bg = gray
+        cancel_fg = "white"
+    else:
+        confirm_bg = "white"
+        confirm_fg = green
+        cancel_bg = "white"
+        cancel_fg = gray
     update_btn = tk.Button(button_frame, text="立即更新", command=on_update,
-                          bg="#4CAF50", fg="white", font=("Arial", 9, "bold"),
+                          bg=confirm_bg, fg=confirm_fg, font=("Arial", 9, "bold"),
                           width=10, height=1)
     update_btn.pack(side=tk.LEFT, padx=8)
     
     # 取消按鈕
     cancel_btn = tk.Button(button_frame, text="稍後更新", command=on_cancel,
-                          bg="#757575", fg="white", font=("Arial", 9),
+                          bg=cancel_bg, fg=cancel_fg, font=("Arial", 9),
                           width=10, height=1)
     cancel_btn.pack(side=tk.LEFT, padx=8)
     
@@ -261,7 +275,8 @@ def show_update_dialog(remote_ver):
     auto_update_var = tk.BooleanVar(value=read_config())
     auto_update_cb = tk.Checkbutton(checkbox_frame, text="自動更新",
                                    variable=auto_update_var,
-                                   font=("Arial", 8))
+                                   font=("Arial", 8),
+                                   command=lambda: update_config(auto_update_var.get()))
     auto_update_cb.pack(anchor=tk.W)
     
     # 等待對話框關閉
