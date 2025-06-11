@@ -456,7 +456,7 @@ class RegionSelectionWidget:
             if system == 'Windows':
                 # 使用 subprocess 執行 utils/get_scalor_factor.py
                 result = subprocess.run(
-                    ['python', 'utils/get_scalor_factor.py'],
+                    ['pythonw', 'utils/get_scalor_factor.py'],
                     capture_output=True,
                     text=True,
                     timeout=5
