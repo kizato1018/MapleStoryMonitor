@@ -39,6 +39,7 @@ class WindowsCaptureEngine(BaseCaptureEngine):
             logger.warning("警告: Windows捕捉引擎僅在Windows平台可用")
             return
         self.user32 = ctypes.windll.user32
+        self.scale_factor = self.get_display_scale_factor()
     
     def initialize_resources(self, window_handle: int, region: Dict[str, int]) -> bool:
         """初始化Windows捕捉資源"""
@@ -74,7 +75,7 @@ class WindowsCaptureEngine(BaseCaptureEngine):
                 'hbm': hbm,
                 'region': region
             }
-            self.scale_factor = self.get_display_scale_factor()
+            
             self.is_initialized = True
             logger.debug(f"Windows捕捉資源初始化成功: {w}x{h}")
             return True
