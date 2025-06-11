@@ -183,10 +183,10 @@ class SettingsTab:
         self._update_tracker_sub_options_visibility()
         
         # 分頁顯示設定
-        tabs_frame = ttk.LabelFrame(self.parent_frame, text="分頁顯示設定", padding=5)
+        tabs_frame = ttk.LabelFrame(self.parent_frame, text="數據監測設定", padding=5)
         tabs_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        ttk.Label(tabs_frame, text="選擇要顯示的分頁:", font=('Arial', 9, 'bold')).pack(anchor=tk.W, pady=(0, 3))
+        ttk.Label(tabs_frame, text="選擇要監測的數據:", font=('Arial', 9, 'bold')).pack(anchor=tk.W, pady=(0, 3))
         
         tabs_checkboxes_frame = ttk.Frame(tabs_frame)
         tabs_checkboxes_frame.pack(fill=tk.X)
