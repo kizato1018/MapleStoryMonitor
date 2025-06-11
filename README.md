@@ -70,7 +70,6 @@
 2. 前往 Python 官方網站：https://www.python.org/downloads/
 3. 點選黃色的 "Download Python 3.x.x" 按鈕（x 代表版本號碼）
 4. 等待下載完成
-
 ---
 
 ### Windows 使用者安裝步驟
@@ -136,6 +135,11 @@
 4. **等待安裝完成**
    - 安裝過程約需 3-5 分鐘
    - 看到「安裝成功」表示完成
+
+5. **安裝憑證**
+   - 開啟 Finder 找到 /Applicatiions/Python 3.X/Install Certificates.command
+   - 點擊兩下安裝
+   - 看到 [Process completed] 表示完成
 
 #### 步驟 3：驗證安裝（Mac）
 1. **開啟終端機**
