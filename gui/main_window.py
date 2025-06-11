@@ -89,7 +89,7 @@ class GameMonitorMainWindow:
         
         
         # OCR引擎
-        self.ocr_engine = OCREngine()
+        self.ocr_engine = OCREngine(self.root)
         self.ocr_frequency_controller = FrequencyController(2.0)  # OCR較低頻率
         # 監控標籤頁
         self.tabs = {}

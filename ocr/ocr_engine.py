@@ -17,7 +17,8 @@ logger = get_logger(__name__)
 class OCREngine:
     """OCR處理引擎"""
     
-    def __init__(self, allow_list: str = "0123456789.[]/%"):
+    def __init__(self, root, allow_list: str = "0123456789.[]/%"):
+        self.root = root
         self.allow_list = allow_list
         self.ocr_reader = None
         self.is_initialized = False
@@ -59,7 +60,7 @@ class OCREngine:
         Args:
             callback: 回調函數，參數為(tab_name, result)
         """
-        self.result_callback = callback
+        self.result_callback = lambda tab_name, result: self.root.after(0, callback(tab_name, result))
     
     
     def process_images(self, images_dict: Dict[str, Image.Image]) -> None:
@@ -201,7 +202,7 @@ class OCREngine:
             str: 處理後的結果
         """
         if not result:
-            return (None, "無法識別1", 0.0)
+            return (None, "無法識別", 0.0)
         
         # 找到最左下角的結果
         # 結果格式: (bbox, text, confidence)
@@ -225,7 +226,7 @@ class OCREngine:
                 min_x = left_x
                 best_result = (bbox, text, confidence)
         
-        return best_result if best_result else (None, "無法識別2", 0.0)
+        return best_result if best_result else (None, "無法識別", 0.0)
 
     def _process_potion_image(self, image: Image.Image, name) -> str:
         """
