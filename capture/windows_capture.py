@@ -39,6 +39,7 @@ class WindowsCaptureEngine(BaseCaptureEngine):
             logger.warning("警告: Windows捕捉引擎僅在Windows平台可用")
             return
         self.user32 = ctypes.windll.user32
+        self.scale_factor = self.get_display_scale_factor()
     
     def initialize_resources(self, window_handle: int, region: Dict[str, int]) -> bool:
         """初始化Windows捕捉資源"""
@@ -209,11 +210,10 @@ class WindowsCaptureEngine(BaseCaptureEngine):
             if self.is_window_valid(window_handle):
                 # 獲取視窗矩形區域
                 left, top, right, bottom = win32gui.GetWindowRect(window_handle)
-                scale_factor = self.get_display_scale_factor()
-                left = int(left * scale_factor)
-                top = int(top * scale_factor)
-                right = int(right * scale_factor)
-                bottom = int(bottom * scale_factor)
+                left = int(left * self.scale_factor)
+                top = int(top * self.scale_factor)
+                right = int(right * self.scale_factor)
+                bottom = int(bottom * self.scale_factor)
                 return (left, top, right, bottom)
         except Exception as e:
             logger.error(f"獲取視窗矩形錯誤: {e}")
@@ -224,7 +224,7 @@ class WindowsCaptureEngine(BaseCaptureEngine):
         """獲取顯示縮放因子（靜態方法，可被外部調用）"""
         try:
             result = subprocess.run(
-                ['python', 'utils/get_scalor_factor.py'],
+                ['pythonw', 'utils/get_scalor_factor.py'],
                 capture_output=True,
                 text=True,
                 timeout=5
