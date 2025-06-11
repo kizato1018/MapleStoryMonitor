@@ -3,6 +3,7 @@ Common Utilities Module
 共用工具函數模組
 """
 
+import tkinter as tk
 import threading
 import time
 from typing import Any, Callable, Optional
@@ -82,21 +83,24 @@ class PerformanceTimer:
 class FrequencyController:
     """頻率控制器"""
     
-    def __init__(self, fps: float = 5.0):
+    def __init__(self, fps: tk.StringVar):
         self.fps = fps
         self.last_time = 0.0
     
     def set_fps(self, fps: float) -> None:
         """設定FPS"""
-        self.fps = max(0.1, fps)  # 最小0.1 FPS
+        # self.fps = max(0.1, fps)  # 最小0.1 FPS
+        # No use
+        pass
     
     def wait(self) -> None:
         """等待到下一個幀時間"""
-        if self.fps <= 0:
+        fps = self.fps.get()
+        if fps <= 0:
             return
         
         current_time = time.time()
-        frame_time = 1.0 / self.fps
+        frame_time = 1.0 / fps
         elapsed = current_time - self.last_time
         
         if elapsed < frame_time:
@@ -112,11 +116,12 @@ class FrequencyController:
         Returns:
             bool: 是否應該處理
         """
-        if self.fps <= 0:
+        fps = float(self.fps.get())
+        if fps <= 0:
             return True
         
         current_time = time.time()
-        frame_time = 1.0 / self.fps
+        frame_time = 1.0 / fps
         elapsed = current_time - self.last_time
         
         if elapsed >= frame_time:

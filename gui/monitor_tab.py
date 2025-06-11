@@ -107,7 +107,7 @@ class GameMonitorTab:
     def stop_capture(self):
         """停止擷取"""
         self.is_capturing = False
-        self.capture_manager.cleanup_resources()
+        self.latest_image = None
     
     def _capture_loop(self):
         """擷取迴圈"""
@@ -140,10 +140,8 @@ class GameMonitorTab:
 
             except Exception as e:
                 logger.error(f"{self.tab_name} 擷取錯誤: {e}")
-            time.sleep(1 /  float(self.capture_manager.capture_fps) if self.capture_manager.capture_fps else 0.1)
+            time.sleep(1 /  float(self.capture_manager.capture_fps))
         
-        # 清理資源
-        self.capture_manager.cleanup_resources()
     
     def _update_preview(self):
         """更新預覽"""

@@ -90,7 +90,7 @@ class GameMonitorMainWindow:
         
         # OCR引擎
         self.ocr_engine = OCREngine(self.root)
-        self.ocr_frequency_controller = FrequencyController(2.0)  # OCR較低頻率
+        self.ocr_frequency_controller = FrequencyController(self.fps_var)
         # 監控標籤頁
         self.tabs = {}
         self.tabs_names = ["HP", "MP", "EXP", "楓幣", "藥水1", "藥水2", "藥水3", "藥水4", "藥水5", "藥水6", "藥水7", "藥水8"]
@@ -344,10 +344,8 @@ class GameMonitorMainWindow:
         # 根據選擇重新添加分頁（在設定分頁之前插入）
         insert_index = setting_tab_index
         
-        for tab_name in self.tabs_names:
-            if self.tab_visibility_vars[tab_name].get() and tab_name in self.tabs:
-                # 使用 tab 對象的 frame 屬性（如果存在）或重新創建
-                tab_obj = self.tabs[tab_name]
+        for tab_name, tab_obj in self.tabs.items():
+            if self.tab_visibility_vars[tab_name].get():
                 if hasattr(tab_obj, 'frame'):
                     frame = tab_obj.frame
                 else:
@@ -360,6 +358,10 @@ class GameMonitorMainWindow:
                 
                 self.notebook.insert(insert_index, frame, text=tab_name)
                 insert_index += 1
+                tab_obj.start_capture()  # 確保每個分頁都開始捕捉
+            else:
+                tab_obj.stop_capture()  # 如果分頁不可見，停止捕捉
+
         
         # 嘗試恢復之前選中的分頁
         if current_tab_name is not None:
@@ -455,6 +457,8 @@ class GameMonitorMainWindow:
                         # 收集所有標籤頁的圖像
                         images_dict = {}
                         for tab_name, tab in self.tabs.items():
+                            if not tab.is_capturing:
+                                continue  # 如果標籤頁沒有在捕捉，跳過
                             image = tab.get_latest_image()
                             if image:
                                 images_dict[tab_name] = image

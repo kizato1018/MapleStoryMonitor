@@ -254,7 +254,6 @@ class OCREngine:
                 detail=1
             )
             bbox, text, confidence = self._potions_postprocess_result(result)
-            print(f"[OCR DEBUG] 藥水OCR結果: {text}, 信心度: {confidence}")  # <--- debug
 
             return text
 
