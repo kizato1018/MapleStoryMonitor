@@ -213,7 +213,12 @@ class GameMonitorMainWindow:
                                                 self.potion_manager)
         self.multi_tracker.pack(fill=tk.X)
         
+        
+        # 設定分隔線
         tk.Frame(self.overview_frame).pack(side=tk.TOP, fill=tk.BOTH, expand=True)  # 分隔線
+
+        # 設定多功能追蹤計算器
+        self.settings_tab.set_multi_tracker_widget(self.multi_tracker)
 
     def _create_status_labels(self):
         """動態創建狀態標籤"""

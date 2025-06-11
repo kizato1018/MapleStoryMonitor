@@ -30,6 +30,11 @@ class MultiTrackerWidget:
         self.coin_manager = coin_manager
         self.potion_manager = potion_manager
         
+        # 個別追蹤器可見性控制
+        self.exp_visible = True
+        self.coin_visible = True
+        self.potion_visible = True
+        
         # 將共用計時器設定給各管理器
         self.exp_manager.timer = self.timer
         self.coin_manager.timer = self.timer
@@ -152,50 +157,107 @@ class MultiTrackerWidget:
         finally:
             self.layout_updating = False
     
+    def set_tracker_visibility(self, exp_visible=True, coin_visible=True, potion_visible=True):
+        """設定個別追蹤器的可見性"""
+        self.exp_visible = exp_visible
+        self.exp_widget.enabled.set(exp_visible)
+        self.coin_visible = coin_visible
+        self.coin_widget.enabled.set(coin_visible)
+        self.potion_visible = potion_visible
+        self.potion_widget.enabled.set(potion_visible)
+        self._update_tracker_visibility()
+    
+    def _update_tracker_visibility(self):
+        """更新追蹤器顯示/隱藏"""
+        if self.exp_widget:
+            if self.exp_visible:
+                self.exp_widget.main_frame.grid()
+            else:
+                self.exp_widget.main_frame.grid_remove()
+        
+        if self.coin_widget:
+            if self.coin_visible:
+                self.coin_widget.main_frame.grid()
+            else:
+                self.coin_widget.main_frame.grid_remove()
+        
+        if self.potion_widget:
+            if self.potion_visible:
+                self.potion_widget.main_frame.grid()
+            else:
+                self.potion_widget.main_frame.grid_remove()
+        
+        # 重新布局
+        self._update_layout()
+    
+    def _get_visible_widgets(self):
+        """獲取當前可見的widget列表"""
+        visible_widgets = []
+        if self.exp_visible and self.exp_widget:
+            visible_widgets.append(self.exp_widget)
+        if self.coin_visible and self.coin_widget:
+            visible_widgets.append(self.coin_widget)
+        if self.potion_visible and self.potion_widget:
+            visible_widgets.append(self.potion_widget)
+        return visible_widgets
+    
     def _arrange_single_column(self):
         """單列排列"""
+        visible_widgets = self._get_visible_widgets()
+        
         # 清除現有grid配置
         for widget in [self.exp_widget, self.coin_widget, self.potion_widget]:
-            widget.main_frame.grid_forget()
+            if widget:
+                widget.main_frame.grid_forget()
         
         # 重新配置grid
         self.trackers_frame.grid_columnconfigure(0, weight=1)
         for i in range(1, 3):
             self.trackers_frame.grid_columnconfigure(i, weight=0)
         
-        for i in range(3):
+        for i in range(len(visible_widgets)):
             self.trackers_frame.grid_rowconfigure(i, weight=1)
         
-        # 排列元件
-        self.exp_widget.main_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=2)
-        self.coin_widget.main_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=2)
-        self.potion_widget.main_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=2)
+        # 排列可見元件
+        for i, widget in enumerate(visible_widgets):
+            widget.main_frame.grid(row=i, column=0, sticky="ew", padx=5, pady=2)
     
     def _arrange_double_column(self):
         """雙列排列"""
+        visible_widgets = self._get_visible_widgets()
+        
         # 清除現有grid配置
         for widget in [self.exp_widget, self.coin_widget, self.potion_widget]:
-            widget.main_frame.grid_forget()
+            if widget:
+                widget.main_frame.grid_forget()
         
         # 重新配置grid
         for i in range(2):
             self.trackers_frame.grid_columnconfigure(i, weight=1)
         self.trackers_frame.grid_columnconfigure(2, weight=0)
         
-        for i in range(2):
+        rows_needed = (len(visible_widgets) + 1) // 2
+        for i in range(rows_needed):
             self.trackers_frame.grid_rowconfigure(i, weight=1)
-        self.trackers_frame.grid_rowconfigure(2, weight=0)
         
-        # 排列元件
-        self.exp_widget.main_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
-        self.coin_widget.main_frame.grid(row=0, column=1, sticky="nsew", padx=2, pady=2)
-        self.potion_widget.main_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=2, pady=2)
+        # 排列可見元件
+        for i, widget in enumerate(visible_widgets):
+            row = i // 2
+            col = i % 2
+            if i == len(visible_widgets) - 1 and len(visible_widgets) % 2 == 1:
+                # 最後一個元件如果是奇數，橫跨兩列
+                widget.main_frame.grid(row=row, column=0, columnspan=2, sticky="ew", padx=2, pady=2)
+            else:
+                widget.main_frame.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
     
     def _arrange_triple_column(self):
         """三列排列"""
+        visible_widgets = self._get_visible_widgets()
+        
         # 清除現有grid配置
         for widget in [self.exp_widget, self.coin_widget, self.potion_widget]:
-            widget.main_frame.grid_forget()
+            if widget:
+                widget.main_frame.grid_forget()
         
         # 重新配置grid
         for i in range(3):
@@ -204,10 +266,9 @@ class MultiTrackerWidget:
         for i in range(1, 3):
             self.trackers_frame.grid_rowconfigure(i, weight=0)
         
-        # 排列元件
-        self.exp_widget.main_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
-        self.coin_widget.main_frame.grid(row=0, column=1, sticky="nsew", padx=2, pady=2)
-        self.potion_widget.main_frame.grid(row=0, column=2, sticky="nsew", padx=2, pady=2)
+        # 排列可見元件
+        for i, widget in enumerate(visible_widgets):
+            widget.main_frame.grid(row=0, column=i, sticky="nsew", padx=2, pady=2)
 
     def _toggle_tracking(self):
         """切換追蹤狀態"""

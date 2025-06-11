@@ -29,9 +29,18 @@ class SettingsTab:
         self.tab_visibility_vars = None
         self.shared_window_widget = None
         
+        # 個別追蹤器顯示變數
+        self.tracker_exp_var = None
+        self.tracker_coin_var = None
+        self.tracker_potion_var = None
+        
         # GUI組件
         self.fps_label = None
         self.transparency_label = None
+        self.tracker_sub_frame = None
+        
+        # 多功能追蹤器widget的引用
+        self.multi_tracker_widget = None
         
     def set_variables(self, shared_fps_var, show_status_var, show_tracker_var, tab_visibility_vars, window_pinned_var=None, window_transparency_var=None, auto_update_var=None):
         """設定從主視窗傳入的變數"""
@@ -43,6 +52,11 @@ class SettingsTab:
         self.window_transparency_var = window_transparency_var
         self.auto_update_var = auto_update_var
         
+        # 初始化個別追蹤器顯示變數
+        self.tracker_exp_var = tk.BooleanVar(value=True)
+        self.tracker_coin_var = tk.BooleanVar(value=True)
+        self.tracker_potion_var = tk.BooleanVar(value=True)
+
     def set_callbacks(self, update_status_visibility, update_tracker_visibility, apply_tab_visibility_changes, update_window_pinning=None, update_window_transparency=None, update_auto_update=None):
         """設定回調函數"""
         self.update_status_visibility = update_status_visibility
@@ -51,6 +65,11 @@ class SettingsTab:
         self.update_window_pinning = update_window_pinning
         self.update_window_transparency = update_window_transparency
         self.update_auto_update = update_auto_update
+
+        
+    def set_multi_tracker_widget(self, multi_tracker_widget):
+        """設定多功能追蹤器widget的引用"""
+        self.multi_tracker_widget = multi_tracker_widget
 
     def create_tab(self):
         """創建設定標籤頁內容"""
@@ -127,11 +146,41 @@ class SettingsTab:
             display_frame,
             text="顯示追蹤計算器",
             variable=self.show_tracker_var,
-            command=self.update_tracker_visibility
+            command=self._on_tracker_visibility_changed
         ).pack(anchor=tk.W, pady=1)
         
+        # 追蹤器子選項框架
+        self.tracker_sub_frame = ttk.Frame(display_frame)
+        self.tracker_sub_frame.pack(fill=tk.X, padx=20, pady=(5, 0))
         
+        ttk.Label(self.tracker_sub_frame, text="追蹤器組件:", font=('Arial', 9)).pack(anchor=tk.W)
         
+        sub_options_frame = ttk.Frame(self.tracker_sub_frame)
+        sub_options_frame.pack(fill=tk.X, padx=10)
+        
+        ttk.Checkbutton(
+            sub_options_frame,
+            text="經驗值追蹤器",
+            variable=self.tracker_exp_var,
+            command=self._update_individual_tracker_visibility
+        ).pack(anchor=tk.W, pady=1)
+        
+        ttk.Checkbutton(
+            sub_options_frame,
+            text="楓幣追蹤器",
+            variable=self.tracker_coin_var,
+            command=self._update_individual_tracker_visibility
+        ).pack(anchor=tk.W, pady=1)
+        
+        ttk.Checkbutton(
+            sub_options_frame,
+            text="藥水追蹤器",
+            variable=self.tracker_potion_var,
+            command=self._update_individual_tracker_visibility
+        ).pack(anchor=tk.W, pady=1)
+        
+        # 初始化子選項顯示狀態
+        self._update_tracker_sub_options_visibility()
         
         # 分頁顯示設定
         tabs_frame = ttk.LabelFrame(self.parent_frame, text="分頁顯示設定", padding=5)
@@ -223,3 +272,29 @@ class SettingsTab:
     def get_window_widget(self):
         """獲取視窗選擇控件"""
         return self.shared_window_widget
+
+    def _on_tracker_visibility_changed(self):
+        """追蹤器顯示狀態改變時的回調"""
+        self.update_tracker_visibility()
+        self._update_tracker_sub_options_visibility()
+    
+    def _update_tracker_sub_options_visibility(self):
+        """更新追蹤器子選項的顯示狀態"""
+        if self.tracker_sub_frame:
+            if self.show_tracker_var.get():
+                # 顯示子選項
+                for widget in self.tracker_sub_frame.winfo_children():
+                    widget.pack(anchor='w', pady=1)
+            else:
+                # 隱藏子選項
+                for widget in self.tracker_sub_frame.winfo_children():
+                    widget.pack_forget()
+    
+    def _update_individual_tracker_visibility(self):
+        """更新個別追蹤器的顯示狀態"""
+        if self.multi_tracker_widget:
+            self.multi_tracker_widget.set_tracker_visibility(
+                exp_visible=self.tracker_exp_var.get(),
+                coin_visible=self.tracker_coin_var.get(),
+                potion_visible=self.tracker_potion_var.get()
+            )
