@@ -364,8 +364,10 @@ class GameMonitorMainWindow:
                 self.notebook.insert(insert_index, frame, text=tab_name)
                 insert_index += 1
                 tab_obj.start_capture()  # 確保每個分頁都開始捕捉
+                logger.debug(f"分頁 {tab_name} 可見，開始捕捉")
             else:
                 tab_obj.stop_capture()  # 如果分頁不可見，停止捕捉
+                logger.debug(f"分頁 {tab_name} 不可見，停止捕捉")
 
         
         # 嘗試恢復之前選中的分頁
@@ -459,7 +461,7 @@ class GameMonitorMainWindow:
             while True:
                 try:
                     if self.ocr_frequency_controller.should_process():
-                        # 收集所有標籤頁的圖像
+                        # 收集所有啟用的標籤頁的圖像
                         images_dict = {}
                         for tab_name, tab in self.tabs.items():
                             if not tab.is_capturing:
@@ -599,9 +601,6 @@ class GameMonitorMainWindow:
     def _start_monitoring(self):
         """開始監控"""
         self.capture_manager.start_capture()
-        for tab_name, tab in self.tabs.items():
-            # 為每個標籤頁啟動捕捉和OCR處理
-            tab.start_capture()
         self._start_ocr_processing()
     
     def _stop_monitoring(self):

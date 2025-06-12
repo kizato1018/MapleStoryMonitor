@@ -169,7 +169,7 @@ python -m pip install -r requirements.txt || error_exit "安裝依賴套件失�
 
 # 創建啟動腳本
 info_msg "[8/8] 創建啟動腳本..."
-cat > run.command << 'EOF'
+cat > "MapleStory Monitor.command" << 'EOF'
 #!/bin/bash
 # MapleStory Monitor 啟動腳本
 
@@ -182,7 +182,7 @@ osascript -e "do shell script \"$SCRIPT_PATH > /dev/null 2>&1 &\""
 EOF
 
 # 設定執行權限
-chmod +x run.command
+chmod +x "MapleStory Monitor.command"
 
 echo
 echo "================================================"
@@ -190,8 +190,8 @@ echo "           🎉 安裝完成！ 🎉"
 echo "================================================"
 echo
 echo "使用方法："
-echo "  • 在終端機中執行: ./run.command"
-echo "  • 或雙擊 run.command 檔案（當程式啟動以後，啟動的終端機可以關閉）"
+echo "  • 在終端機中執行: ./MapleStory Monitor.command"
+echo "  • 或雙擊 MapleStory Monitor.command 檔案（當程式啟動以後，啟動的終端機可以關閉）"
 echo
 echo "注意事項："
 echo "  • 請確保 MapleStory 遊戲已啟動"

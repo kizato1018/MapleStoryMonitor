@@ -210,7 +210,7 @@ echo           Installation Complete!
 echo ================================================
 echo.
 echo Usage:
-if exist "run.lnk" (
+if exist "MapleStory Monitor.lnk" (
     echo   Double-click the run shortcut to start the program
 ) else (
     echo   Double-click run.bat to start the program

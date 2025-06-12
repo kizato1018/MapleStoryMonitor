@@ -181,7 +181,7 @@
    - 按照螢幕指示完成安裝
 
 3. **啟動程式**
-   - 安裝完成後，雙擊 `run` 啟動程式
+   - 安裝完成後，雙擊 `MapleStory Monitor` 啟動程式
 
 #### Mac 使用者
 
@@ -206,8 +206,8 @@
 
 3. **啟動程式**
    - 安裝完成後，可以用以下任一方式啟動：
-     - **終端機啟動**：在程式資料夾中執行 `./run.command`
-     - **雙擊啟動**：雙擊 `run.command` 檔案（程式啟動後可關閉終端機視窗）
+     - **終端機啟動**：在程式資料夾中執行 `./MapleStory Monitor.command`
+     - **雙擊啟動**：雙擊 `MapleStory Monitor.command` 檔案（程式啟動後可關閉終端機視窗）
 
 4. **重要許可權設定（首次啟動時可能需要）**
    - macOS 可能會要求「輔助使用」許可權來擷取螢幕
@@ -363,13 +363,13 @@ cd MapleStoryMonitor
 3. **建立啟動腳本（可選）**
    - 為了方便日後使用，可以建立批次檔：
    ```batch
-   echo @echo off > run.bat
-   echo cd /d "%~dp0" >> run.bat
-   echo call venv\Scripts\activate.bat >> run.bat
-   echo python main.py >> run.bat
-   echo pause >> run.bat
+   echo @echo off > MapleStory Monitor.bat
+   echo cd /d "%~dp0" >> MapleStory Monitor.bat
+   echo call venv\Scripts\activate.bat >> MapleStory Monitor.bat
+   echo python main.py >> MapleStory Monitor.bat
+   echo pause >> MapleStory Monitor.bat
    ```
-   - 之後可以直接雙擊 `run.bat` 啟動程式
+   - 之後可以直接雙擊 `MapleStory Monitor.bat` 啟動程式
 
 #### Mac 使用者
 
@@ -383,7 +383,7 @@ cd MapleStoryMonitor
    ```
 
 3. **建立啟動腳本（可選）**
-   - 為了方便日後使用，可以建立啟動腳本 `run.command`：
+   - 為了方便日後使用，可以建立啟動腳本 `MapleStory Monitor.command`：
    ```bash
    #!/bin/bash
    # MapleStory Monitor 啟動腳本
@@ -395,8 +395,8 @@ cd MapleStoryMonitor
 
    osascript -e "do shell script \"$SCRIPT_PATH > /dev/null 2>&1 &\""
    ```
-   - 之後可以執行 `./run.command` 啟動程式
-   - 或 雙擊 `run.command`
+   - 之後可以執行 `./MapleStory Monitor.command` 啟動程式
+   - 或 雙擊 `MapleStory Monitor.command`
 
 ### 重要提醒
 
@@ -522,6 +522,17 @@ A: 確認遊戲狀態
 - 確保遊戲視窗沒有被最小化
 - 嘗試切換遊戲視窗後重新搜尋
 
+**Q: 截取的結果一片黑**
+
+A: 嘗試使用管理員權限執行
+
+**Q: OCR 一直卡在初始化中... (Mac)**
+
+A: 前往 /Applications/Python 3.X/
+- 執行 Install Certifactes.command
+- 如果沒有 /Applications/Python 3.X
+- 在終端機執行 pip install --upgrade certifi
+
 **Q: OCR 識別結果不正確**
 
 A: 調整設定和區域
@@ -593,12 +604,12 @@ pip install --upgrade -r requirements.txt
    # 在程式資料夾中建立啟動指令碼
    echo '#!/bin/bash' > ~/Desktop/StartMapleMonitor.command
    echo "cd $(pwd)" >> ~/Desktop/StartMapleMonitor.command
-   echo './run.sh' >> ~/Desktop/StartMapleMonitor.command
+   echo './MapleStory Monitor.sh' >> ~/Desktop/StartMapleMonitor.command
    chmod +x ~/Desktop/StartMapleMonitor.command
    ```
 
 2. **使用 Finder 建立別名**：
-   - 右鍵點選 `run.command` 檔案
+   - 右鍵點選 `MapleStory Monitor.command` 檔案
    - 選擇「製作別名」
    - 將別名拖放到桌面或應用程式資料夾
 

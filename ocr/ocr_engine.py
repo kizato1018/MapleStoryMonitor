@@ -3,6 +3,7 @@ OCR Engine Module
 光學字符識別引擎模組
 """
 
+import os
 import warnings
 import threading
 import time
@@ -142,7 +143,7 @@ class OCREngine:
             saturation = hsv[:, :, 1]
 
             # 設定彩度門檻（例如 100）
-            threshold = 85
+            threshold = 80
 
             # 建立遮罩：彩度超過門檻的位置
             mask1 = saturation > threshold
@@ -155,8 +156,13 @@ class OCREngine:
             # 建立遮罩（需比原圖大2）
             output = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
             
-            #進行手動2質化
-            _, output = cv2.threshold(output, 80, 255, cv2.THRESH_BINARY)
+            #進行自適應閾值處理
+            output = cv2.adaptiveThreshold(output, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
+                                        cv2.THRESH_BINARY, 13, 3)
+
+            iterations = 1 if min(img.shape[0], img.shape[1]) > 100 else 1
+            kernel = np.ones((3, 3), np.uint8) if min(img.shape[0], img.shape[1]) > 100 else np.ones((2, 2), np.uint8)
+            output = cv2.morphologyEx(output, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8), iterations=iterations)
                 
             h, w = output.shape
             mask = np.zeros((h + 2, w + 2), np.uint8)
@@ -181,8 +187,21 @@ class OCREngine:
             # floodfilled 中原本與邊界連通的黑色已變為白色 (255)
             # 其餘區域保留原樣
             output = floodfilled
-            # output = cv2.bitwise_not(output)
-            output = cv2.morphologyEx(output, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8), iterations=1)
+
+            kernel = np.ones((4, 4), np.uint8) if min(img.shape[0], img.shape[1]) > 100 else np.ones((2, 2), np.uint8)
+            output = cv2.morphologyEx(output, cv2.MORPH_OPEN, kernel, iterations=1)
+
+            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(output, connectivity=8)
+
+            if num_labels > 5:
+                min_area = max(sorted(stats[1:, cv2.CC_STAT_AREA])[-4], img.shape[0] * img.shape[1] * 0.01)
+            else:
+                min_area = img.shape[0] * img.shape[1] * 0.01
+
+            
+            for i in range(1, num_labels):
+                if stats[i, cv2.CC_STAT_AREA] < min_area:
+                    output[labels == i] = 0
 
             
         except Exception as e:
@@ -242,15 +261,16 @@ class OCREngine:
             if not self.ocr_reader:
                 return "OCR未初始化"
             # 將PIL圖像轉換為numpy數組
+            # 確保tmp目錄存在
+            if os.path.exists("tmp"):
+                Image.Image.save(image, f"tmp/{name}.png")  # 保存圖像以便調試
             image = self._potions_preprocess_image(image)
-            # Image.fromarray(image).save(f"tmp/{name}_2.png")  # 保存圖像以便調試
             result = self.ocr_reader.readtext(
                 image,
-                allowlist=self.allow_list,
+                allowlist='0123456789',
                 paragraph=False,
-                text_threshold=0.6,
-                link_threshold=0.5,
-                low_text=0.6,
+                text_threshold=0.6, link_threshold=0.5,
+                low_text=0.45, height_ths=0.7,
                 detail=1
             )
             bbox, text, confidence = self._potions_postprocess_result(result)
@@ -290,8 +310,8 @@ class OCREngine:
                 img_array,
                 allowlist=self.allow_list,
                 paragraph=False,
-                width_ths=0.7,
-                height_ths=0.7
+                text_threshold=0.6, link_threshold=0.5,
+                low_text=0.45, height_ths=0.7
             )
 
             # 提取識別的文本

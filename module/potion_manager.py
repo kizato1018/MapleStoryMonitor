@@ -1,6 +1,7 @@
 import re
 from typing import Optional, List, Tuple
 from collections import deque
+import statistics
 from module.monitor_timer import MonitorTimer
 from utils.log import get_logger
 
@@ -14,25 +15,20 @@ class PotionManager:
         self.last_valid_value = None  # 記錄最後一次有效的藥水值
         self.value = None
         self.potion_history = deque(maxlen=600)  # 10分鐘，每秒一筆
+        self.value_history = deque(maxlen=100)  # 記錄藥水數值變化，用於中值濾波
         self.timer = MonitorTimer()  # 使用MonitorTimer管理時間
         self.start_potion_value = None  # int or None
         self.total_used = 0  # 累計總使用量
         self.unit_cost = 0  # 藥水單價
-        self.last_potion_value = None  # 上一次的藥水值，用於檢測補充
-        self.error_threshold = 50  # 當前值小於上一次值的容錯範圍，默認為10個單位
+        self.prev_value = None  # 上一次的藥水值，用於檢測補充
+        self.error_threshold = 50  # 當前值小於上一次值的容錯範圍，默認為50個單位
         self.enabled = False
+        self.median_window_size = 5  # 中值濾波窗口大小
 
     def start_tracking(self):
         """開始追蹤藥水使用量"""
         self.timer.start_tracking()
-        potion_value = self._parse_potion_value(self.potion) if self.potion else None
-        self.start_potion_value = potion_value
-        self.last_potion_value = potion_value
-        self.total_used = 0  # 重置累計使用量
-        # 清空歷史記錄
-        self.potion_history.clear()
-        if potion_value is not None:
-            self.potion_history.append((self.timer.start_time, self.total_used))
+        self._reset()  # 重置狀態
 
     def is_tracking(self) -> bool:
         """檢查是否正在追蹤藥水"""
@@ -45,6 +41,9 @@ class PotionManager:
     def pause_tracking(self):
         """暫停追蹤藥水使用量"""
         self.timer.pause_tracking()
+        total_used = self.total_used
+        self._reset()
+        self.total_used = total_used  # 保留累計使用量
 
     def resume_tracking(self):
         """恢復追蹤藥水使用量"""
@@ -57,10 +56,14 @@ class PotionManager:
     def reset_tracking(self):
         """重置追蹤"""
         self.timer.reset_tracking()
+        self._reset()
+
+    def _reset(self):
         self.start_potion_value = None
-        self.last_potion_value = None
+        self.prev_value = None
         self.total_used = 0
         self.potion_history.clear()
+        self.value_history.clear()
 
     def set_unit_cost(self, cost: str):
         """設定藥水單價"""
@@ -73,18 +76,16 @@ class PotionManager:
         except ValueError as e:
             logger.error(f"無效的藥水單價: {e}. 請確保輸入為有效的正整術。")
 
-    def update(self, potion_value: str):
+    def update(self, potion_text: str):
         """更新藥水數量"""
         # 檢查新的藥水值是否有效
-        self.value = self._parse_potion_value(potion_value)
+        self.value = self._parse_potion_value(potion_text)
+        self.value = self._correct_value(self.value)  # 確保值在合理範圍內
         
+        self.potion = potion_text
         # 如果新值有效，更新藥水值和最後有效值
-        if self.value is not None:
-            self.potion = potion_value
+        if self._is_valid_number(self.value):
             self.last_valid_value = self.value
-        else:
-            # 如果新值無效，保持原有的 potion 值但使用最後有效值進行計算
-            self.potion = potion_value  # 保存原始值用於顯示
         
         if self.timer.is_tracking and not self.timer.is_paused:
             # 使用計時器基準時間，而非直接使用 time.time()
@@ -94,29 +95,46 @@ class PotionManager:
             calc_value = self.last_valid_value
             
             if calc_value is not None:
-                # 檢測補充邏輯：從0變成其他數字 = 補充3000個
-                if (self.last_potion_value is not None and 
-                    self.last_potion_value == 0 and 
+                # 只有當數值有變化時才記錄到 value_history
+                if not self.value_history or calc_value != self.value_history[-1][1]:
+                    self.value_history.append((current_effective_time, calc_value))
+                
+                # 應用中值濾波處理歷史數據
+                # self._apply_median_filter()
+                
+                # 獲取最新的濾波後數值
+                # calc_value = self.value_history[-1][1] if self.value_history else calc_value
+                
+                # 檢測補充邏輯：從0變成其他數字 = 補充
+                if (self.prev_value is not None and 
+                    self.prev_value == 0 and 
                     calc_value > 0):
-                    # 檢測到補充，累加3000個到使用量
-                    self.total_used += (3000 - calc_value) 
+                    # 檢測到補充，清空歷史記錄但保持累計使用量
+                    logger.info(f"檢測到藥水補充：從 0 到 {calc_value}")
+                    self.value_history.clear()
+                    self.potion_history.clear()
+                    self.start_potion_value = calc_value
+                    # 重新記錄當前狀態
+                    self.value_history.append((current_effective_time, calc_value))
+                    self.potion_history.append((current_effective_time, self.total_used))
                 
                 # 檢測正常使用：當前值小於上一次值
-                elif (self.last_potion_value is not None and 
-                      self.last_potion_value > calc_value and
-                      self.last_potion_value - calc_value < self.error_threshold):
-                    used_amount = self.last_potion_value - calc_value
+                elif (self.prev_value is not None and 
+                      self.prev_value > calc_value and
+                      self.prev_value - calc_value < self.error_threshold):
+                    used_amount = self.prev_value - calc_value
                     self.total_used += used_amount
                 
-                self.last_potion_value = calc_value
+                self.prev_value = calc_value
                 
                 # 僅每秒保留一筆資料，使用有效時間計算
                 if not self.potion_history or int(current_effective_time) > int(self.potion_history[-1][0]):
-                    self.potion_history.append((current_effective_time, self.total_used))
+                    self.potion_history.append((current_effective_time, calc_value))
                     self.timer.update_last_update_time()
                 
                 if self.timer.start_time is None:
                     self.timer.start_time = current_effective_time
+
 
     def _get_current_effective_time(self) -> float:
         """獲取當前有效時間（基於計時器的時間基準）"""
@@ -130,12 +148,40 @@ class PotionManager:
         # 返回基於起始時間加上有效經過時間的時間點
         return self.timer.start_time + elapsed
 
-    def _get_valid_potion_value(self) -> Optional[int]:
+    def _is_valid_number(self, value) -> bool:
         """獲取有效的藥水值（優先使用最後有效值）"""
-        if self.last_valid_value:
-            return self.last_valid_value
-        return self.value if self.value else None
-
+        return isinstance(value,(int)) and value >= 0 and value <= 3000
+    
+    def _correct_value(self, value: Optional[int]) -> Optional[int]:
+        """
+        確保藥水值在合理範圍內，並返回修正後的值
+        value: int (e.g. 2999)
+        Returns:
+            int or None (如果值不在範圍內則返回 None)
+        """
+        if self._is_valid_number(value):
+            return value
+        else:
+            last_value = self.last_valid_value
+            if last_value is not None:
+                if len(str(value)) > len(str(last_value)):
+                    value1 = int(str(value)[:len(str(last_value))])
+                    value2 = int(str(value)[-len(str(last_value)):])
+                    if abs(value1 - last_value) < abs(value2 - last_value):
+                        return value1
+                    else:
+                        return value2
+            else:
+                if len(str(value)) > 4:
+                    value1 = int(str(value)[:4]) if int(str(value)[:4]) <= 3000 else None
+                    value2 = int(str(value)[-4:]) if int(str(value)[-4:]) <= 3000 else None
+                    if value1 is not None and value2 is not None:
+                        return max(value1, value2)
+                    elif value1 is not None:
+                        return value1
+                    elif value2 is not None:
+                        return value2
+        return None
     def _parse_potion_value(self, value: str) -> Optional[int]:
         """
         解析藥水值，回傳 potion_value
@@ -145,8 +191,7 @@ class PotionManager:
             return None
             
         try:
-            # 移除所有非數字字符（包括逗號、空格等）
-            cleaned_value = re.sub(r'[^\d]', '', value)
+            cleaned_value = re.sub(r'[^\d]', '', value)  # 移除非數字字符
             if cleaned_value:
                 return int(cleaned_value)
             return None
@@ -281,7 +326,6 @@ class PotionManager:
         cost_per_10min, total_cost = self.get_cost_per_10min()
         cost_10min_data, total_cost_data = self.get_cost_per_10min_data()
         elapsed_time = self.get_elapsed_time()
-        # cur_value = self._get_valid_potion_value()
         timer_status = self.timer.get_status()
         
         return {
@@ -302,6 +346,146 @@ class PotionManager:
             "total_used_amount": self.total_used,
             "timer_status": timer_status
         }
+
+    def _apply_median_filter(self) -> None:
+        """
+        對 value_history 應用中值濾波器來移除異常值
+        """
+        if len(self.value_history) < self.median_window_size:
+            return
+        
+        # 獲取最近的數值進行分析
+        recent_entries = list(self.value_history)[-self.median_window_size:]
+        recent_values = [entry[1] for entry in recent_entries]
+        
+        try:
+            median_value = statistics.median(recent_values)
+            
+            # 檢查是否有異常值需要移除
+            anomalous_indices = []
+            for i, (timestamp, value) in enumerate(recent_entries):
+                # 跳過可能的補充值（大幅增加）
+                if i > 0 and value > recent_entries[i-1][1] + 1000:
+                    continue
+                    
+                # 檢測異常低值或高值
+                if abs(value - median_value) > 100:
+                    # 進一步驗證是否為異常值
+                    other_values = [v for j, v in enumerate(recent_values) if j != (len(recent_entries) - len(recent_values) + i)]
+                    if len(other_values) >= 2:
+                        other_median = statistics.median(other_values)
+                        if abs(value - other_median) > 50:
+                            anomalous_indices.append(len(self.value_history) - len(recent_entries) + i)
+                            logger.warning(f"檢測到異常藥水數值: {value}, 中值: {median_value:.1f}")
+            
+            # 移除異常值
+            if anomalous_indices:
+                self._remove_anomalous_entries(anomalous_indices)
+                
+        except statistics.StatisticsError:
+            logger.warning("中值濾波計算錯誤")
+
+    def _remove_anomalous_entries(self, anomalous_indices: List[int]) -> None:
+        """
+        移除異常的 value_history 條目，並移除對應的 potion_history 條目
+        """
+        # 獲取要移除的時間戳和數值
+        anomalous_timestamps = []
+        anomalous_values = []
+        for index in sorted(anomalous_indices, reverse=True):
+            if 0 <= index < len(self.value_history):
+                timestamp, value = self.value_history[index]
+                anomalous_timestamps.append(timestamp)
+                anomalous_values.append(value)
+                # 從 value_history 移除
+                del self.value_history[index]
+                logger.info(f"已移除異常藥水數值: {value} (時間: {timestamp})")
+        
+        # 檢查是否移除的異常值影響到起始值
+        need_recalculate = False
+        if self.start_potion_value in anomalous_values:
+            # 如果起始值被移除，重新設定起始值
+            if self.value_history:
+                self.start_potion_value = self.value_history[0][1]
+                logger.info(f"重新設定起始藥水值為: {self.start_potion_value}")
+            else:
+                self.start_potion_value = None
+            need_recalculate = True
+        
+        # 從 potion_history 移除對應時間的記錄（允許1秒誤差）
+        if anomalous_timestamps:
+            original_potion_count = len(self.potion_history)
+            filtered_potion_history = deque(maxlen=self.potion_history.maxlen)
+            
+            for timestamp, usage in self.potion_history:
+                # 檢查是否在異常時間範圍內
+                is_anomalous = any(abs(timestamp - at) <= 1 for at in anomalous_timestamps)
+                if not is_anomalous:
+                    filtered_potion_history.append((timestamp, usage))
+            
+            self.potion_history = filtered_potion_history
+            removed_potion_count = original_potion_count - len(self.potion_history)
+            
+            if removed_potion_count > 0:
+                logger.info(f"已移除 {removed_potion_count} 個對應的使用量記錄")
+                need_recalculate = True
+        
+        # 如果需要重新計算，重建 total_used 和 potion_history
+        if need_recalculate:
+            self._recalculate_usage_from_history()
+
+    def _recalculate_usage_from_history(self) -> None:
+        """
+        從清理後的 value_history 重新計算使用量和 potion_history
+        """
+        if not self.value_history:
+            self.total_used = 0
+            self.potion_history.clear()
+            return
+        
+        # 重置計算
+        old_total = self.total_used
+        self.total_used = 0
+        new_potion_history = deque(maxlen=self.potion_history.maxlen)
+        
+        # 從第一個記錄開始重新計算
+        prev_value = None
+        for i, (timestamp, value) in enumerate(self.value_history):
+            if i == 0:
+                # 第一個記錄，設定為起始點
+                if self.start_potion_value is None:
+                    self.start_potion_value = value
+                prev_value = value
+                # 添加初始記錄
+                new_potion_history.append((timestamp, self.total_used))
+            else:
+                # 檢測使用量：當前值小於前一個值
+                if (prev_value is not None and 
+                    prev_value > value and 
+                    prev_value - value < self.error_threshold):
+                    used_amount = prev_value - value
+                    self.total_used += used_amount
+                
+                # 檢測補充：當前值大幅增加
+                elif (prev_value is not None and 
+                      value > prev_value + 1000):
+                    # 補充不影響總使用量，但重置參考點
+                    logger.info(f"在重計算中檢測到補充：從 {prev_value} 到 {value}")
+                
+                prev_value = value
+                
+                # 只保留整秒的記錄
+                if not new_potion_history or int(timestamp) > int(new_potion_history[-1][0]):
+                    new_potion_history.append((timestamp, self.total_used))
+        
+        # 更新 potion_history
+        self.potion_history = new_potion_history
+        
+        # 更新最後的藥水值
+        if self.value_history:
+            self.prev_value = self.value_history[-1][1]
+        
+        logger.info(f"重新計算完成：總使用量從 {old_total} 調整為 {self.total_used}")
 
 class TotalPotionManager:
     """負責管理多個 PotionManager 實例"""
