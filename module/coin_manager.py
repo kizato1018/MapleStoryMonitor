@@ -174,7 +174,7 @@ class CoinManager:
         total_coin_value = self._calculate_total_coin()
         
         # 計算10分鐘楓幣
-        if elapsed_time < 600:  # 600秒 = 10分鐘
+        if len(self.coin_history) < 600:  # 600秒 = 10分鐘
             projected_value = self._calculate_10min_coin_projected(elapsed_time)
             coin_10min_data = projected_value
         else:

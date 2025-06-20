@@ -292,7 +292,7 @@ class EXPManager:
         total_exp_value, total_exp_percent = self._calculate_total_exp()
         
         # 計算10分鐘經驗
-        if elapsed_time < 600:  # 600秒 = 10分鐘
+        if len(self.exp_history) < 600:  # 600秒 = 10分鐘
             projected_value, projected_percent = self._calculate_10min_exp_projected(elapsed_time)
             exp_10min_data = (projected_value, projected_percent)
         else:

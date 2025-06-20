@@ -198,7 +198,7 @@ class PotionManager:
         total_used = self._get_current_potion_used()
         
         # 計算10分鐘使用量
-        if elapsed_time < 600:  # 600秒 = 10分鐘
+        if len(self.potion_history) < 600:  # 600秒 = 10分鐘
             projected_value = self._calculate_10min_potion_projected(elapsed_time)
             potion_10min_data = projected_value
         else:
