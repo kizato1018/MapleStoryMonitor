@@ -19,8 +19,9 @@ logger = get_logger(__name__)
 class RegionSelectionWidget:
     """區域選擇控制元件"""
     
-    def __init__(self, parent, config_callback: Optional[Callable] = None):
+    def __init__(self, parent, tab_name, config_callback: Optional[Callable] = None):
         self.parent = parent
+        self.tab_name = tab_name
         self.config_callback = config_callback
         self.x_var = tk.StringVar(value="0")
         self.y_var = tk.StringVar(value="0")
@@ -55,7 +56,8 @@ class RegionSelectionWidget:
         # 按鈕區域
         button_frame = ttk.Frame(self.frame)
         button_frame.pack(fill=tk.X, pady=5)
-        
+        if self.tab_name == 'HP' or self.tab_name == 'MP' or self.tab_name == 'EXP' or '藥水' in self.tab_name:
+            ttk.Button(button_frame, text="自動擷取", command=self._auto_detect).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="滑鼠選取區域", command=self._start_mouse_selection).pack(side=tk.LEFT, padx=5)
         
         # 初始化選取相關變數
@@ -69,7 +71,26 @@ class RegionSelectionWidget:
     def set_target_window_callback(self, callback: Callable):
         """設定獲取目標視窗的回調函數"""
         self.get_target_window = callback
+
+    def set_detect_region_callback(self, callback: Callable):
+        """設定自動擷取區域的回調函數"""
+        self.detect_region = callback
     
+    def _auto_detect(self):
+        """自動擷取區域"""
+        if hasattr(self, 'detect_region') and callable(self.detect_region):
+            try:
+                region = self.detect_region(self.tab_name)
+                if region:
+                    self.set_region(region['x'], region['y'], region['w'], region['h'])
+                    logger.info(f"{self.tab_name} 自動擷取區域成功: {region}")
+                else:
+                    logger.warning(f"{self.tab_name} 自動擷取區域失敗: 未返回有效區域")
+            except Exception as e:
+                logger.error(f"自動擷取區域失敗: {e}")
+        else:
+            logger.error("自動擷取區域回調未設定或不可調用")
+
     def _start_mouse_selection(self):
         """開始滑鼠選取區域"""
         # 獲取目標視窗
@@ -408,6 +429,7 @@ class RegionSelectionWidget:
         except Exception as e:
             logger.error(f"確認選取錯誤: {e}")
             self._close_selection_window()
+
 
     def _cancel_selection(self, event=None):
         """取消選取"""

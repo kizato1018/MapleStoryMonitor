@@ -24,6 +24,7 @@ from module.coin_manager import CoinManager
 from module.potion_manager import TotalPotionManager
 from utils.common import FrequencyController
 from utils.log import get_logger
+from utils.version import get_version
 from capture.base_capture import create_capture_engine
 
 logger = get_logger(__name__)
@@ -33,8 +34,9 @@ class GameMonitorMainWindow:
     """遊戲監控主視窗"""
     
     def __init__(self):
+        self.version = get_version()
         self.root = tk.Tk()
-        self.root.title("遊戲狀態監控")
+        self.root.title(f"遊戲狀態監控 v{self.version}")
         
         # 配置管理器 - 移到前面以便載入視窗大小
         self.config_manager = ConfigManager()
@@ -94,7 +96,7 @@ class GameMonitorMainWindow:
         # 監控標籤頁
         self.tabs = {}
         self.tabs_names = ["HP", "MP", "EXP", "楓幣", "藥水1", "藥水2", "藥水3", "藥水4", "藥水5", "藥水6", "藥水7", "藥水8"]
-        self.tab_visibility_vars = {
+        self.tab_enabled_vars = {
             tab_name: tk.BooleanVar() for tab_name in self.tabs_names
         }
         # 設定標籤頁
@@ -154,7 +156,7 @@ class GameMonitorMainWindow:
             self.fps_var,
             self.show_status_var,
             self.show_tracker_var,
-            self.tab_visibility_vars,
+            self.tab_enabled_vars,
             self.window_pinned_var,
             self.window_transparency_var,
             self.auto_update_var
@@ -230,7 +232,7 @@ class GameMonitorMainWindow:
         
         # 只為可見的分頁創建標籤
         for stat_name in self.tabs_names:
-            if self.tab_visibility_vars[stat_name].get():
+            if self.tab_enabled_vars[stat_name].get():
                 stat_frame = ttk.Frame(self.results_frame)
                 stat_frame.pack(fill=tk.X, pady=0)
                 
@@ -350,7 +352,7 @@ class GameMonitorMainWindow:
         insert_index = setting_tab_index
         
         for tab_name, tab_obj in self.tabs.items():
-            if self.tab_visibility_vars[tab_name].get():
+            if self.tab_enabled_vars[tab_name].get():
                 if hasattr(tab_obj, 'frame'):
                     frame = tab_obj.frame
                 else:
@@ -399,7 +401,7 @@ class GameMonitorMainWindow:
             potion_tab_name = f"藥水{i+1}"
             if potion_tab_name in self.tabs:
                 potion_manager = self.potion_manager[i]
-                potion_manager.enabled = self.tab_visibility_vars[potion_tab_name].get()
+                potion_manager.enabled = self.tab_enabled_vars[potion_tab_name].get()
 
         self._save_config_if_ready()
     
@@ -474,7 +476,7 @@ class GameMonitorMainWindow:
                         # 處理OCR
                         if images_dict:
                             logger.debug("[OCR DEBUG] 呼叫 process_images")
-                            self.ocr_engine.process_images(images_dict)
+                            self.ocr_engine.process_images(images_dict, self.tab_enabled_vars)
                         else:
                             logger.debug("[OCR DEBUG] 沒有可用的圖像進行OCR")
                             pass
@@ -645,7 +647,7 @@ class GameMonitorMainWindow:
             
             # 載入分頁可見性配置
             tab_visibility = display_config.get('tab_visibility', {})
-            for tab_name, var in self.tab_visibility_vars.items():
+            for tab_name, var in self.tab_enabled_vars.items():
                 var.set(tab_visibility.get(tab_name, True))
             
             # 設定視窗標題（支援舊格式）
@@ -672,9 +674,6 @@ class GameMonitorMainWindow:
                 else:
                     logger.warning(f"未找到 {tab_name} 的配置")
             
-            # 設定OCR允許字符列表
-            allow_list = global_config.get('ocr_allow_list', '0123456789.[]/%')
-            self.ocr_engine.set_allow_list(allow_list)
         
         # 配置載入完成後，啟用視窗大小變更監聽
         self.is_window_configure_bound = True
@@ -695,7 +694,7 @@ class GameMonitorMainWindow:
         self.window_transparency_var.trace_add('write', lambda *args: self._save_config_if_ready())
         
         # 綁定分頁可見性變數的回調
-        for var in self.tab_visibility_vars.values():
+        for var in self.tab_enabled_vars.values():
             var.trace_add('write', lambda *args: self._save_config_if_ready())
         
         # 綁定視窗選擇控件的回調
@@ -785,7 +784,7 @@ class GameMonitorMainWindow:
             'window_transparency': self.window_transparency_var.get(),
             'tab_visibility': {
                 tab_name: var.get() 
-                for tab_name, var in self.tab_visibility_vars.items()
+                for tab_name, var in self.tab_enabled_vars.items()
             }
         }
         

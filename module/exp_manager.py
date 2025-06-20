@@ -74,13 +74,12 @@ class EXPManager:
                 if not self.exp_history or int(current_effective_time) > int(self.exp_history[-1][0]):
                     if self._is_level_up(calc_percent):
                         # 如果升級，清空歷史記錄
+                        _, last_value, last_percent = self.exp_history[-1]
+                        self.total_exp_value += last_value - self.start_exp_value
+                        self.total_exp_percent += last_percent - self.start_exp_percent
                         self.exp_history.clear()
                         self.start_exp_value = calc_value
                         self.start_exp_percent = calc_percent
-                        total_exp = calc_value - self.start_exp_value if self.start_exp_value is not None else 0
-                        total_exp_percent = calc_percent - self.start_exp_percent if self.start_exp_percent is not None else 0
-                        self.total_exp_value += total_exp if total_exp is not None else 0
-                        self.total_exp_percent += total_exp_percent if total_exp_percent is not None else 0.0
                     self.exp_history.append((current_effective_time, calc_value, calc_percent))
                     self.timer.update_last_update_time()
                 
@@ -289,7 +288,7 @@ class EXPManager:
             return None, None
         
         # 計算總累計經驗
-        total_exp_value, total_exp_percent = self.total_exp_value, self.total_exp_percent
+        total_exp_value, total_exp_percent = self._calculate_total_exp()
         
         # 計算10分鐘經驗
         if elapsed_time < 600:  # 600秒 = 10分鐘
