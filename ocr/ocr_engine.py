@@ -394,7 +394,7 @@ class OCREngine:
         # 四等分點
         width = img.shape[1]
         padding = img.shape[1] * 0.05
-        quarters = [width * i / 5 for i in range(1, 5)]
+        quarters = [padding + width * i / 5 for i in range(1, 5)]
         quarter_margin = w * 0.02
     
         for i in range(1, num_labels):  # 跳過 index 0：背景
