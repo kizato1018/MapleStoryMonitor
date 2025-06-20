@@ -143,9 +143,10 @@ class OCREngine:
         merged_image, tab_positions = self._merge_images(process_images)
         if DEBUG:
             os.makedirs('tmp', exist_ok=True)
-            cv2.imwrite(f'tmp/merged_status.png', merged_image)
-        allowlist = '012456789./%[]'
-        results = self.ocr_reader.readtext(merged_image, allowlist=allowlist, low_text=0.5, text_threshold=0.8, link_threshold=0.7)
+            save_image = cv2.cvtColor(merged_image, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(f'tmp/merged_status.png', save_image)
+        allowlist = '0123456789[]./%'
+        results = self.ocr_reader.readtext(merged_image, allowlist=allowlist)
         if not results:
             logger.warning("狀態欄OCR結果為空")
             return
@@ -303,12 +304,12 @@ class OCREngine:
         Returns:
             np.ndarray: 預處理後的圖像
         """
-        output = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        h, w = output.shape[:2]
-        scale = min(200 / ((w + h) / 2), 3.5)
-        output = cv2.resize(output, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+        # output = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # h, w = output.shape[:2]
+        # scale = min(200 / ((w + h) / 2), 3.5)
+        # output = cv2.resize(output, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
-        return output      
+        return image      
         
     def _preprocess_potion_image(self, image: np.ndarray) -> np.ndarray:
         """
