@@ -171,12 +171,15 @@ class PotionManager:
 
     def _calculate_10min_potion_actual(self) -> Optional[int]:
         """計算實際10分鐘藥水使用量（超過10分鐘時使用）"""
+        target_time = self._get_current_effective_time() - 600  # 10分鐘前的時間點
+        past_value = None
+        for timestamp, value in self.potion_history:
+            if timestamp >= target_time:
+                # 找到最接近10分鐘前的記錄
+                past_value = value
+                break
         
-        timestamp, past_value = self.potion_history[0] if self.potion_history else (None, None)
-                
-        if past_value is not None:
-            return past_value - self.last_valid_value if past_value - self.last_valid_value >= 0 else 0
-        return None
+        return (past_value - self.last_valid_value) if past_value is not None and past_value > self.last_valid_value else 0
 
     def get_potion_per_10min_data(self) -> Tuple[Optional[int], Optional[int]]:
         """
@@ -195,7 +198,7 @@ class PotionManager:
         total_used = self._get_current_potion_used()
         
         # 計算10分鐘使用量
-        if elapsed_time < 0:  # 600秒 = 10分鐘
+        if elapsed_time < 600:  # 600秒 = 10分鐘
             projected_value = self._calculate_10min_potion_projected(elapsed_time)
             potion_10min_data = projected_value
         else:

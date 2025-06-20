@@ -167,7 +167,7 @@ class GameMonitorTab:
             y = config.get('y', 0)
             w = config.get('w', 100)
             h = config.get('h', 30)
-            
+            cost = config.get('potion_cost', None)
             # 確保數值有效
             try:
                 x = int(x) if x is not None else 0
@@ -178,8 +178,15 @@ class GameMonitorTab:
                 # 確保寬高為正數
                 w = max(w, 1)
                 h = max(h, 1)
+
+                # 設定藥水單價
+                if hasattr(self, 'potion_cost_var') and cost is not None:
+                    self.potion_cost_var.set(str(cost))
                 
-                logger.debug(f"{self.tab_name} 載入配置: x={x}, y={y}, w={w}, h={h}")
+                debug_msg = f"{self.tab_name} 載入配置: x={x}, y={y}, w={w}, h={h}"
+                if cost is not None:
+                    debug_msg += f", 藥水單價={cost}"
+                logger.debug(debug_msg)
                 self.region_widget.set_region(x, y, w, h)
             except (ValueError, TypeError) as e:
                 logger.error(f"{self.tab_name} 配置載入錯誤: {e}")
@@ -195,6 +202,12 @@ class GameMonitorTab:
                     'w': int(region['w']),
                     'h': int(region['h'])
                 }
+                if hasattr(self, 'potion_cost_var'):
+                    potion_cost = self.potion_cost_var.get()
+                    if potion_cost.isdigit():
+                        config['potion_cost'] = int(potion_cost)
+                    else:
+                        config['potion_cost'] = None
                 logger.debug(f"{self.tab_name} 儲存配置: {config}")
                 return config
         except (ValueError, TypeError) as e:

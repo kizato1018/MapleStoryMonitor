@@ -51,17 +51,8 @@ class EXPManager:
 
     def update(self, exp_text: str):
         """更新經驗值"""
-        # 檢查新的經驗值是否有效
-        value, percent = self._parse_exp_value(exp_text)
-        
-        # 如果新值有效，更新經驗值和最後有效值
-        if value is not None or percent is not None:
-            self.exp = exp_text
-            self.last_valid_exp = exp_text
-        else:
-            # 如果新值無效，保持原有的 exp 值但使用最後有效值進行計算
-            self.exp = exp_text  # 保存原始值用於顯示
-        
+        self.exp = exp_text
+
         if self.timer.is_tracking and not self.timer.is_paused:
             # 使用計時器基準時間，而非直接使用 time.time()
             current_effective_time = self._get_current_effective_time()
@@ -73,10 +64,13 @@ class EXPManager:
                 # 僅每秒保留一筆資料，使用有效時間計算
                 if not self.exp_history or int(current_effective_time) > int(self.exp_history[-1][0]):
                     if self._is_level_up(calc_percent):
-                        # 如果升級，清空歷史記錄
-                        _, last_value, last_percent = self.exp_history[-1]
-                        self.total_exp_value += last_value - self.start_exp_value
-                        self.total_exp_percent += last_percent - self.start_exp_percent
+                        # 如果升級，累計前一個等級的經驗並清空歷史記錄
+                        if self.exp_history:
+                            _, last_value, last_percent = self.exp_history[-1]
+                            if last_value is not None and self.start_exp_value is not None:
+                                self.total_exp_value += last_value - self.start_exp_value
+                            if last_percent is not None and self.start_exp_percent is not None:
+                                self.total_exp_percent += last_percent - self.start_exp_percent
                         self.exp_history.clear()
                         self.start_exp_value = calc_value
                         self.start_exp_percent = calc_percent
@@ -90,6 +84,7 @@ class EXPManager:
                     self.start_exp_percent = calc_percent
                 if self.timer.start_time is None:
                     self.timer.start_time = current_effective_time
+                self.last_valid_exp = (calc_value, calc_percent)  # 更新最後有效經驗值
 
     def _is_level_up(self, percent) -> bool:
         """檢查是否升級"""
@@ -123,38 +118,37 @@ class EXPManager:
         # 如果當前值無效，直接使用最後有效值
         if current_value is None and current_percent is None:
             if self.last_valid_exp:
-                return self._parse_exp_value(self.last_valid_exp)
+                return self.last_valid_exp
             return None, None
         
         # 檢查百分比是否超過100%（辨識錯誤）
         if current_percent is not None and current_percent > 100:
             if self.last_valid_exp:
-                return self._parse_exp_value(self.last_valid_exp)
+                return self.last_valid_exp
             return None, None
         
         # 必須等到有超過10筆資料才進行誤差檢查
-        if len(self.exp_history) >= 10 and current_value is not None and current_percent is not None:
+        if len(self.exp_history) >= 10 and current_value is not None and current_percent is not None and current_percent > 0:
             expected_exp_per_percent = self._calculate_exp_per_percent_from_history()
-            if expected_exp_per_percent is not None:
+            if expected_exp_per_percent is not None and expected_exp_per_percent > 0:
                 # 計算當前數據的每百分比經驗值
-                if current_percent > 0:
-                    current_exp_per_percent = current_value / current_percent
-                    
-                    # 計算誤差百分比
-                    error_rate = abs(current_exp_per_percent - expected_exp_per_percent) / expected_exp_per_percent
-                    
-                    # 如果誤差超過1%，視為辨識失誤
-                    if error_rate > 0.01:  # 1%
-                        if self.last_valid_exp:
-                            return self._parse_exp_value(self.last_valid_exp)
-                        return None, None
+                current_exp_per_percent = current_value / current_percent
+                
+                # 計算誤差百分比
+                error_rate = abs(current_exp_per_percent - expected_exp_per_percent) / expected_exp_per_percent
+                
+                # 如果誤差超過5%，視為辨識失誤（放寬閾值以避免過度敏感）
+                if error_rate > 0.05:  # 5%
+                    if self.last_valid_exp:
+                        return self.last_valid_exp
+                    return None, None
         
         # 當前值通過驗證，返回當前值
         return current_value, current_percent
-    
+
     def _calculate_exp_per_percent_from_history(self) -> Optional[float]:
         """從歷史資料計算每百分比代表的經驗值（剔除超過誤差範圍的資料）"""
-        if len(self.exp_history) < 10:
+        if len(self.exp_history) < 5:  # 進一步降低要求
             return None
         
         # 先收集所有有效的比值
@@ -164,21 +158,21 @@ class EXPManager:
                 exp_per_percent = value / percent
                 all_ratios.append(exp_per_percent)
         
-        if len(all_ratios) < 10:
+        if len(all_ratios) < 3:  # 進一步降低要求
             return None
         
         # 計算初始平均值
         initial_avg = sum(all_ratios) / len(all_ratios)
         
-        # 剔除超過1%誤差的資料
+        # 剔除超過10%誤差的資料（進一步放寬閾值）
         valid_ratios = []
         for ratio in all_ratios:
             error_rate = abs(ratio - initial_avg) / initial_avg
-            if error_rate <= 0.01:  # 1%
+            if error_rate <= 0.05:  # 5%
                 valid_ratios.append(ratio)
         
         if len(valid_ratios) < 2:
-            return None
+            return initial_avg  # 如果過濾後數據太少，直接使用平均值
         
         # 計算平均值作為預期的每百分比經驗值
         return sum(valid_ratios) / len(valid_ratios)
@@ -193,24 +187,30 @@ class EXPManager:
             return None, None
             
         try:
-            value = value.replace(" ", "")
-            # 百分比
+            # 先解析百分比，再移除空格處理數值
+            original_value = value
+            
+            # 百分比解析（不移除空格，避免影響匹配）
             percent_patterns = [
-                r'[\[\(](\d+\.?\d*)%',     # [20.3%
-                r'/(\d+\.?\d*)%',          # /20.3%
-                r'[\[\(](\d+\.?\d*)[%）\]]', # [20.3% 或 [20.3] 或 [20.3）
-                r'/(\d+\.?\d*)[%）\]7]',   # /20.3% 或 /20.3] 或 /20.37
-                r'(\d+\.?\d*)%',           # 20.3%
+                r'[\[\(](\d+\.?\d*)%',          # [20.3%
+                r'/(\d+\.?\d*)%',               # /20.3%
+                r'[\[\(](\d+\.?\d*)[%）\]]',    # [20.3% 或 [20.3] 或 [20.3）
+                r'/(\d+\.?\d*)(?=[%）\]7]|$)',  # /20.3% 或 /20.3] 或 /20.37 (修正正則)
+                r'[\[\(](\d+\.?\d*)(?=[%）\]\s]|$)',  # [20.5 (缺少結尾符號)
+                r'(\d+\.?\d*)%',                # 20.3%
             ]
             percent_value = None
             for pattern in percent_patterns:
-                match = re.search(pattern, value)
+                match = re.search(pattern, original_value)
                 if match:
                     percent_value = float(match.group(1))
                     break
-            # 數值部分（取第一個數字，轉為int）
-            number_match = re.search(r'(\d+)', value)
+            
+            # 數值部分解析（移除空格後取第一個連續數字）
+            value_no_space = original_value.replace(" ", "")
+            number_match = re.search(r'(\d+)', value_no_space)
             value_num = int(number_match.group(1)) if number_match else None
+            
             return value_num, percent_value
         except (ValueError, AttributeError):
             return None, None
@@ -256,14 +256,15 @@ class EXPManager:
         target_time = current_effective_time - 600  # 10分鐘前（基於有效時間）
         cur_value, cur_percent = self._get_current_exp_values()
         
-        # 找到最接近10分鐘前的記錄
         past_value = None
         past_percent = None
+        # 找到最接近10分鐘前的記錄
         for timestamp, value, percent in self.exp_history:
             if timestamp >= target_time:
-                past_value = value
-                past_percent = percent
+                past_value = value if value is not None else self.start_exp_value
+                past_percent = percent if percent is not None else self.start_exp_percent
                 break
+        
                 
         value_diff = (cur_value - past_value) if (cur_value is not None and past_value is not None) else None
         percent_diff = (cur_percent - past_percent) if (cur_percent is not None and past_percent is not None) else None

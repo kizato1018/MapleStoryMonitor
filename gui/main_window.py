@@ -471,11 +471,9 @@ class GameMonitorMainWindow:
                             image = tab.get_latest_image()
                             if image:
                                 images_dict[tab_name] = image
-                        logger.debug(f"[OCR DEBUG] images_dict keys: {list(images_dict.keys())}")  # <--- debug
 
                         # 處理OCR
                         if images_dict:
-                            logger.debug("[OCR DEBUG] 呼叫 process_images")
                             self.ocr_engine.process_images(images_dict, self.tab_enabled_vars)
                         else:
                             logger.debug("[OCR DEBUG] 沒有可用的圖像進行OCR")
@@ -490,7 +488,6 @@ class GameMonitorMainWindow:
 
     def _update_ocr_result(self, tab_name: str, result: str):
         """更新OCR結果"""
-        logger.debug(f"[OCR DEBUG] set_ocr_result({tab_name}, {result})")
         
         # 將辨識結果傳送到對應的管理器和多功能追蹤器
         if tab_name == "HP" or tab_name == "MP":
@@ -512,7 +509,6 @@ class GameMonitorMainWindow:
             mp_formatted = self.hpmp_manager.get_formatted_mp()
             
             # Debug parse 結果
-            logger.debug(f"[PARSE DEBUG] HP parse: {hp_formatted}, MP parse: {mp_formatted}")
             
             # 更新對應標籤頁的結果（使用原始OCR結果）
             if tab_name == "HP" and "HP" in self.tabs:
@@ -544,7 +540,6 @@ class GameMonitorMainWindow:
                 else:
                     exp_formatted = exp_val_str
                 # Debug parse 結果
-                logger.debug(f"[PARSE DEBUG] EXP parse: {exp_formatted}")
             else:
                 exp_formatted = "N/A"
             
@@ -581,7 +576,6 @@ class GameMonitorMainWindow:
                     potion_count = str(potion_value)
                 else:
                     potion_count = "N/A"
-                logger.debug(f"[PARSE DEBUG] {tab_name} parse: {potion_count}")
                 
             # 更新對應標籤頁的結果（使用原始OCR結果）
             if tab_name in self.tabs:
