@@ -322,7 +322,7 @@ class OCREngine:
         img = image.copy()
         h, w = img.shape[:2]
         avg_size = (w + h) / 2
-        scale = min(200 / avg_size, 3.5)
+        scale = min(250 / avg_size, 4)
         img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
         h, w = img.shape[:2]
@@ -393,8 +393,9 @@ class OCREngine:
 
         # 四等分點
         width = img.shape[1]
-        quarters = [width * i / 4 for i in range(1, 4)]
-        quarter_margin = w * 0.01
+        padding = img.shape[1] * 0.05
+        quarters = [width * i / 5 for i in range(1, 5)]
+        quarter_margin = w * 0.02
     
         for i in range(1, num_labels):  # 跳過 index 0：背景
             area = stats[i, cv2.CC_STAT_AREA]

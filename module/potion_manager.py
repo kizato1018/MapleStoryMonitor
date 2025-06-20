@@ -41,9 +41,6 @@ class PotionManager:
     def pause_tracking(self):
         """暫停追蹤藥水使用量"""
         self.timer.pause_tracking()
-        total_used = self.total_used
-        self._reset()
-        self.total_used = total_used  # 保留累計使用量
 
     def resume_tracking(self):
         """恢復追蹤藥水使用量"""
@@ -111,8 +108,10 @@ class PotionManager:
                 self.potion_history.append((current_effective_time, calc_value))
                 self.timer.update_last_update_time()
 
-                if self.start_potion_value is None:
-                    self.start_potion_value = calc_value
+            if self.start_potion_value is None:
+                self.start_potion_value = calc_value
+            if self.timer.start_time is None:
+                self.timer.start_time = current_effective_time
 
             self.last_valid_value = calc_value
 
@@ -174,17 +173,16 @@ class PotionManager:
         """計算實際10分鐘藥水使用量（超過10分鐘時使用）"""
         current_effective_time = self._get_current_effective_time()
         target_time = current_effective_time - 600  # 10分鐘前（基於有效時間）
-        current_used = self._get_current_potion_used()
         
         # 找到最接近10分鐘前的記錄
-        past_used = None
-        for timestamp, used in self.potion_history:
+        past_value = None
+        for timestamp, value in self.potion_history:
             if timestamp >= target_time:
-                past_used = used
+                past_value = value
                 break
                 
-        if past_used is not None:
-            return current_used - past_used
+        if past_value is not None:
+            return self.last_valid_value - past_value if self.last_valid_value - past_value >= 0 else 0
         return None
 
     def get_potion_per_10min_data(self) -> Tuple[Optional[int], Optional[int]]:
