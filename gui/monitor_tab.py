@@ -33,8 +33,6 @@ class GameMonitorTab:
         self.is_capturing = False
         self.capture_thread = None
         self.get_window_info_callback = get_window_info_callback
-        
-        # 捕捉引擎 - 使用外部傳入的實例
         self.capture_manager = capture_engine
         
         self._create_tab()
@@ -50,8 +48,9 @@ class GameMonitorTab:
         self.control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # 區域選擇元件
-        self.region_widget = RegionSelectionWidget(self.control_frame, None)
+        self.region_widget = RegionSelectionWidget(self.control_frame, self.tab_name, None)
         self.region_widget.set_target_window_callback(self.get_window_info_callback)
+        self.region_widget.set_detect_region_callback(self.capture_manager.detect_region)
         self.region_widget.pack(fill=tk.X, pady=(0, 10))
             
         

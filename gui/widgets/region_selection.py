@@ -19,8 +19,9 @@ logger = get_logger(__name__)
 class RegionSelectionWidget:
     """區域選擇控制元件"""
     
-    def __init__(self, parent, config_callback: Optional[Callable] = None):
+    def __init__(self, parent, tab_name, config_callback: Optional[Callable] = None):
         self.parent = parent
+        self.tab_name = tab_name
         self.config_callback = config_callback
         self.x_var = tk.StringVar(value="0")
         self.y_var = tk.StringVar(value="0")
@@ -55,7 +56,8 @@ class RegionSelectionWidget:
         # 按鈕區域
         button_frame = ttk.Frame(self.frame)
         button_frame.pack(fill=tk.X, pady=5)
-        
+        if self.tab_name == 'HP' or self.tab_name == 'MP' or self.tab_name == 'EXP' or '藥水' in self.tab_name:
+            ttk.Button(button_frame, text="自動擷取", command=self._auto_detect).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="滑鼠選取區域", command=self._start_mouse_selection).pack(side=tk.LEFT, padx=5)
         
         # 初始化選取相關變數
@@ -69,7 +71,26 @@ class RegionSelectionWidget:
     def set_target_window_callback(self, callback: Callable):
         """設定獲取目標視窗的回調函數"""
         self.get_target_window = callback
+
+    def set_detect_region_callback(self, callback: Callable):
+        """設定自動擷取區域的回調函數"""
+        self.detect_region = callback
     
+    def _auto_detect(self):
+        """自動擷取區域"""
+        if hasattr(self, 'detect_region') and callable(self.detect_region):
+            try:
+                region = self.detect_region(self.tab_name)
+                if region:
+                    self.set_region(region['x'], region['y'], region['w'], region['h'])
+                    logger.info(f"{self.tab_name} 自動擷取區域成功: {region}")
+                else:
+                    logger.warning(f"{self.tab_name} 自動擷取區域失敗: 未返回有效區域")
+            except Exception as e:
+                logger.error(f"自動擷取區域失敗: {e}")
+        else:
+            logger.error("自動擷取區域回調未設定或不可調用")
+
     def _start_mouse_selection(self):
         """開始滑鼠選取區域"""
         # 獲取目標視窗
@@ -80,6 +101,7 @@ class RegionSelectionWidget:
                 return
             self.target_hwnd = window_info['hwnd']
             self.target_rect = window_info['rect']
+            self.scale_factor = window_info['scale_factor']
         else:
             messagebox.showwarning("警告", "無法獲取目標視窗")
             return
@@ -137,7 +159,6 @@ class RegionSelectionWidget:
             import platform
             self.is_macos = platform.system() == 'Darwin'
 
-            self.scale_factor = self._get_display_scale_factor()
             self.selection_window = tk.Toplevel(self.parent)
             self.selection_window.title("選取擷取區域")
             self.selection_window.attributes('-topmost', True)
@@ -409,6 +430,7 @@ class RegionSelectionWidget:
             logger.error(f"確認選取錯誤: {e}")
             self._close_selection_window()
 
+
     def _cancel_selection(self, event=None):
         """取消選取"""
         self._close_selection_window()
@@ -446,47 +468,3 @@ class RegionSelectionWidget:
         self.y_var.set(str(y))
         self.w_var.set(str(w))
         self.h_var.set(str(h))
-
-    def _get_display_scale_factor(self):
-        """使用 subprocess 獲取系統顯示縮放比例"""
-        
-        try:
-            system = platform.system()
-            
-            if system == 'Windows':
-                # 使用 subprocess 執行 utils/get_scalor_factor.py
-                result = subprocess.run(
-                    ['pythonw', 'utils/get_scalor_factor.py'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                if result.returncode == 0:
-                    scale_factor = float(result.stdout.strip())
-                    logger.info(f"從 subprocess 獲取 Windows 縮放因子: {scale_factor}")
-                    return scale_factor
-                else:
-                    logger.warning(f"subprocess 獲取縮放因子失敗: {result.stderr}")
-                    return 1.0
-            else:
-                try:
-                    from Cocoa import NSScreen
-                    main_screen = NSScreen.mainScreen()
-                    if main_screen:
-                        backing_scale_factor = main_screen.backingScaleFactor()
-                        return float(backing_scale_factor)
-                    return 1.0
-                except Exception as e:
-                    logger.warning(f"無法獲取顯示縮放因子: {e}")
-                    # 嘗試另一種方法
-                    try:
-                        result = subprocess.run(['system_profiler', 'SPDisplaysDataType'], 
-                                            capture_output=True, text=True)
-                        if 'Retina' in result.stdout:
-                            return 2.0  # 大多數 Retina 顯示器
-                        return 1.0
-                    except:
-                        return 2.0  # 預設為 2.0，因為大多數現代 Mac 都是 Retina
-        except Exception as e:
-            logger.error(f"獲取顯示縮放比例失敗: {e}")
-            return 1.0

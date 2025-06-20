@@ -208,11 +208,13 @@ class WindowSelectionWidget:
         if self.selected_hwnd and self.capture_engine:
             try:
                 rect = self.capture_engine.get_window_rect(self.selected_hwnd)
+                scale_factor = self.capture_engine.get_scale_factor()
                 if rect:
                     logger.info(f"獲取視窗資訊成功: hwnd={self.selected_hwnd}, rect={rect}")
                     return {
                         'hwnd': self.selected_hwnd,
                         'rect': rect,
+                        'scale_factor': scale_factor,
                         'title': self.window_title_var.get()
                     }
                 else:

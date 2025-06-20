@@ -9,6 +9,7 @@ logger = get_logger(__name__)
 PYOBJC_AVAILABLE = False
 if sys.platform == "darwin":
     try:
+        from AppKit import NSScreen
         from Cocoa import NSApplication, NSWorkspace
         from Quartz import (
             CGWindowListCopyWindowInfo, CGWindowListCreateImage,
@@ -247,48 +248,38 @@ class MacCaptureEngine(BaseCaptureEngine):
                         logical_y = int(bounds['Y'])
                         logical_width = int(bounds['Width'])
                         logical_height = int(bounds['Height'])
+
+                        center_x = logical_x + logical_width // 2
+                        center_y = logical_y + logical_height // 2
+
+                        self.monitor_index = 0
+                        for i, screen in enumerate(NSScreen.screens()):
+                            screen_frame = screen.frame()
+                            if (screen_frame.origin.x <= center_x <= screen_frame.origin.x + screen_frame.size.width and
+                                screen_frame.origin.y <= center_y <= screen_frame.origin.y + screen_frame.size.height):
+                                self.monitor_index = i
+                                break
                         
                         # 獲取顯示縮放因子
-                        scale_factor = self.get_display_scale_factor()
-                        logger.debug(f"顯示縮放因子: {scale_factor}")
-                        logger.debug(f"邏輯尺寸: {logical_width}x{logical_height}")
-                        
+                        scale_factor = self.scale_factors[self.monitor_index] if self.monitor_index < len(self.scale_factors) else 1.0
                         # 轉換為實際像素座標
                         actual_x = int(logical_x * scale_factor)
                         actual_y = int(logical_y * scale_factor)
                         actual_width = int(logical_width * scale_factor)
                         actual_height = int(logical_height * scale_factor)
                         
-                        logger.debug(f"實際像素尺寸: {actual_width}x{actual_height}")
+                        logger.debug(f"螢幕 #{self.monitor_index} 使用縮放因子: {scale_factor}")
+                        logger.debug(f"邏輯座標: ({logical_x}, {logical_y}, {logical_width}, {logical_height})")
+                        logger.debug(f"實際像素座標: ({actual_x}, {actual_y}, {actual_width}, {actual_height})")
                         
                         return (actual_x, actual_y, actual_x + actual_width, actual_y + actual_height)
             return None
         except Exception as e:
             logger.error(f"獲取視窗矩形錯誤: {e}")
             return None
-    
-    @staticmethod
-    def get_display_scale_factor() -> float:
-        """獲取顯示縮放因子（靜態方法，可被外部調用）"""
+
+    def get_scale_factor(self) -> float:
+        """獲取當前螢幕的縮放比例"""
         if not PYOBJC_AVAILABLE:
             return 1.0
-
-        try:
-            from Cocoa import NSScreen
-            main_screen = NSScreen.mainScreen()
-            if main_screen:
-                backing_scale_factor = main_screen.backingScaleFactor()
-                return float(backing_scale_factor)
-            return 1.0
-        except Exception as e:
-            logger.warning(f"無法獲取顯示縮放因子: {e}")
-            # 嘗試另一種方法
-            try:
-                import subprocess
-                result = subprocess.run(['system_profiler', 'SPDisplaysDataType'], 
-                                      capture_output=True, text=True)
-                if 'Retina' in result.stdout:
-                    return 2.0  # 大多數 Retina 顯示器
-                return 1.0
-            except:
-                return 2.0  # 預設為 2.0，因為大多數現代 Mac 都是 Retina
+        return self.scale_factors[self.monitor_index] if self.monitor_index < len(self.scale_factors) else 1.0

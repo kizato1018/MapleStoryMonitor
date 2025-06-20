@@ -10,3 +10,4 @@ dist
 run.lnk
 .DS_Store
 run.command
+*.spec

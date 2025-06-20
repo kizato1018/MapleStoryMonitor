@@ -39,7 +39,7 @@ class WindowsCaptureEngine(BaseCaptureEngine):
             logger.warning("警告: Windows捕捉引擎僅在Windows平台可用")
             return
         self.user32 = ctypes.windll.user32
-        self.scale_factor = self.get_display_scale_factor()
+        
     
     def initialize_resources(self, window_handle: int, region: Dict[str, int]) -> bool:
         """初始化Windows捕捉資源"""
@@ -210,32 +210,28 @@ class WindowsCaptureEngine(BaseCaptureEngine):
             if self.is_window_valid(window_handle):
                 # 獲取視窗矩形區域
                 left, top, right, bottom = win32gui.GetWindowRect(window_handle)
-                left = int(left * self.scale_factor)
-                top = int(top * self.scale_factor)
-                right = int(right * self.scale_factor)
-                bottom = int(bottom * self.scale_factor)
+                win_center_x = (left + right) // 2
+                win_center_y = (top + bottom) // 2
+
+                monitors = win32api.EnumDisplayMonitors()
+                self.monitor_index = 0
+                for i, monitor in enumerate(monitors):
+                    monitor_left, monitor_top, monitor_right, monitor_bottom = monitor[2]
+                    if (monitor_left <= win_center_x <= monitor_right and
+                        monitor_top <= win_center_y <= monitor_bottom):
+                        self.monitor_index = i
+                scale_factor = self.scale_factors[self.monitor_index] if self.monitor_index < len(self.scale_factors) else 1.0
+                left = int(left * scale_factor)
+                top = int(top * scale_factor)
+                right = int(right * scale_factor)
+                bottom = int(bottom * scale_factor)
+                logger.debug(f"螢幕 #{self.monitor_index} 使用縮放因子: {scale_factor}")
+                logger.debug(f"rect: ({left}, {top}, {right}, {bottom})")
                 return (left, top, right, bottom)
         except Exception as e:
             logger.error(f"獲取視窗矩形錯誤: {e}")
         return None
 
-    @staticmethod
-    def get_display_scale_factor() -> float:
-        """獲取顯示縮放因子（靜態方法，可被外部調用）"""
-        try:
-            result = subprocess.run(
-                ['pythonw', 'utils/get_scalor_factor.py'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if result.returncode == 0:
-                scale_factor = float(result.stdout.strip())
-                logger.info(f"從 subprocess 獲取 Windows 縮放因子: {scale_factor}")
-                return scale_factor
-            else:
-                logger.warning(f"subprocess 獲取縮放因子失敗: {result.stderr}")
-                return 1.0
-        except Exception as e:
-            logger.error(f"獲取 Windows 縮放因子錯誤: {e}")
-            return 1.0
+    def get_scale_factor(self) -> float:
+        """獲取當前螢幕的縮放比例"""
+        return self.scale_factors[self.monitor_index] if self.monitor_index < len(self.scale_factors) else 1.0
